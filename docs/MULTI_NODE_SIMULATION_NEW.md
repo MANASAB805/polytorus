@@ -7,7 +7,7 @@ PolyTorusブロックチェーンの複数ノード環境でのトランザク�
 
 ### 概要
 - **送信側API**: `/send`エンドポイントで送信者ノードの`tx_count`をインクリメント
-- **受信側API**: `/transaction`エンドポイントで受信者ノードの`rx_count`をインクリメント  
+- **受信側API**: `/transaction`エンドポイントで受信者ノードの`rx_count`をインクリメント
 - **完全な追跡**: 各トランザクションが送信側と受信側の両方で正しく記録される
 
 ### 伝播フロー
@@ -44,7 +44,7 @@ curl -X POST -H "Content-Type: application/json" \
   -d '{"from":"wallet_node-0","to":"wallet_node-1","amount":100,"nonce":1001}' \
   "http://127.0.0.1:9000/send"
 
-# Step 2: 受信者ノードに受信を記録  
+# Step 2: 受信者ノードに受信を記録
 curl -X POST -H "Content-Type: application/json" \
   -d '{"from":"wallet_node-0","to":"wallet_node-1","amount":100,"nonce":1001}' \
   "http://127.0.0.1:9001/transaction"
@@ -108,7 +108,7 @@ curl http://127.0.0.1:9001/stats  # 受信者の統計
 **受信記録API (`/transaction`) のレスポンス:**
 ```json
 {
-  "status": "accepted", 
+  "status": "accepted",
   "transaction_id": "baf3ecb7-86dd-4523-9d8a-0eb90eb6da43",
   "message": "Transaction from wallet_node-0 to wallet_node-1 for 100 accepted"
 }
@@ -208,7 +208,7 @@ output = "console"
 - **TX Sent**: 送信トランザクション数 (**✅ 実装済み**)
 - **TX Recv**: 受信トランザクション数 (**✅ 実装済み**)
 - **Network Latency**: ノード間通信遅延
-- **Block Propagation**: ブロック伝播時間  
+- **Block Propagation**: ブロック伝播時間
 - **API Response Time**: HTTP API応答時間
 
 ## 🔄 利用可能なスクリプト
@@ -246,7 +246,7 @@ done
    ```bash
    # 使用中のポートを確認
    netstat -tulpn | grep :9000
-   
+
    # 別のベースポートを使用
    ./scripts/simulate.sh local --base-port 9100
    ```
@@ -269,10 +269,10 @@ done
    ```bash
    # ヘルスチェック
    curl http://127.0.0.1:9000/health
-   
+
    # プロセス確認
    ./scripts/simulate.sh status
-   
+
    # 再起動
    ./scripts/simulate.sh stop && ./scripts/simulate.sh local
    ```
@@ -324,10 +324,10 @@ data/simulation/
    ```bash
    # 送信前
    curl -s http://127.0.0.1:9000/stats | jq '.transactions_sent'  # 0
-   
+
    # 送信実行
    curl -X POST http://127.0.0.1:9000/send -d '{...}'
-   
+
    # 送信後
    curl -s http://127.0.0.1:9000/stats | jq '.transactions_sent'  # 1
    ```
@@ -336,10 +336,10 @@ data/simulation/
    ```bash
    # 受信前
    curl -s http://127.0.0.1:9001/stats | jq '.transactions_received'
-   
+
    # 受信実行
    curl -X POST http://127.0.0.1:9001/transaction -d '{...}'
-   
+
    # 受信後
    curl -s http://127.0.0.1:9001/stats | jq '.transactions_received'  # +1
    ```

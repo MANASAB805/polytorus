@@ -50,10 +50,10 @@ echo
 if command -v hyperfine &> /dev/null; then
     echo "3. Running example performance tests with hyperfine..."
     echo
-    
+
     echo "Difficulty adjustment example:"
     hyperfine --warmup 3 --runs 10 'cargo run --release --example difficulty_adjustment'
-    
+
     echo
     echo "Simple difficulty test:"
     hyperfine --warmup 3 --runs 10 'cargo run --release --example simple_difficulty_test'

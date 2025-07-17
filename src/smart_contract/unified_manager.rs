@@ -10,15 +10,15 @@ use tokio::sync::RwLock;
 
 use super::{
     privacy_engine::PrivacyContractEngine,
+    unified_contract_storage::UnifiedContractStorage,
     unified_engine::{
         ContractExecutionRecord, ContractStateStorage, ContractType, EngineInfo,
         UnifiedContractEngine, UnifiedContractExecution, UnifiedContractMetadata,
         UnifiedContractResult, UnifiedGasManager,
     },
-    unified_storage::UnifiedContractStorage,
     wasm_engine::WasmContractEngine,
 };
-use crate::diamond_io_integration::PrivacyEngineConfig;
+use crate::diamond_io_integration_unified::PrivacyEngineConfig;
 
 /// Unified smart contract manager that routes operations to appropriate engines
 pub struct UnifiedContractManager {
@@ -57,8 +57,11 @@ impl UnifiedContractManager {
     }
 
     /// Create a manager with default configuration
-    pub fn with_defaults(storage_path: &str) -> Result<Self> {
-        let storage = Arc::new(UnifiedContractStorage::new(storage_path)?);
+    pub async fn with_defaults(storage_path: &str) -> Result<Self> {
+        let backend_type = super::unified_contract_storage::StorageBackendType::Sled {
+            path: storage_path.to_string(),
+        };
+        let storage = Arc::new(UnifiedContractStorage::new(backend_type).await?);
         let gas_manager = UnifiedGasManager::new(Default::default());
         let privacy_config = PrivacyEngineConfig::dummy(); // Safe default
 
@@ -67,7 +70,9 @@ impl UnifiedContractManager {
 
     /// Create an in-memory manager for testing
     pub fn in_memory() -> Result<Self> {
-        let storage = Arc::new(super::unified_storage::SyncInMemoryContractStorage::new());
+        let storage = Arc::new(
+            super::unified_contract_storage::SyncInMemoryContractStorage::new_sync_memory(),
+        );
         let gas_manager = UnifiedGasManager::new(Default::default());
         let privacy_config = PrivacyEngineConfig::dummy();
 

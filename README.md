@@ -567,7 +567,7 @@ Learn more in the [Diamond IO Contracts Guide](docs/DIAMOND_IO_CONTRACTS.md)
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Rust 1.70+ 
+- Rust 1.70+
 - Git
 - OpenFHE library (for Diamond IO features)
 
@@ -606,7 +606,7 @@ make build
 
 # The pre-commit hook will automatically run on every commit:
 # - cargo fmt (formatting)
-# - cargo clippy (linting) 
+# - cargo clippy (linting)
 # - cargo test (basic tests)
 
 git add .

@@ -5,10 +5,9 @@
 
 #[cfg(test)]
 mod tests {
-    use super::super::network_config::*;
-    use super::super::p2p_enhanced::*;
-
     use std::{net::SocketAddr, time::Duration};
+
+    use super::super::{network_config::*, p2p_enhanced::*};
 
     /// Test network configuration loading
     #[test]

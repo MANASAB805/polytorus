@@ -18,7 +18,7 @@ topology:
       env:
         - ROUTER_ID=65001
         - AS_NUMBER=65001
-    
+
     # AS 65002 - Europe (Frankfurt)
     router-eu:
       kind: linux
@@ -31,7 +31,7 @@ topology:
       env:
         - ROUTER_ID=65002
         - AS_NUMBER=65002
-    
+
     # AS 65003 - Asia Pacific (Singapore)
     router-ap:
       kind: linux
@@ -44,7 +44,7 @@ topology:
       env:
         - ROUTER_ID=65003
         - AS_NUMBER=65003
-    
+
     # AS 65004 - Edge/Mobile Network
     router-edge:
       kind: linux
@@ -320,25 +320,25 @@ topology:
         latency: 100ms
         bandwidth: 10gbps
         loss: 0.01%
-    
+
     - endpoints: ["router-na-east:eth2", "router-ap:eth1"]
       vars:
         latency: 180ms
         bandwidth: 10gbps
         loss: 0.02%
-    
+
     - endpoints: ["router-eu:eth2", "router-ap:eth2"]
       vars:
         latency: 160ms
         bandwidth: 1gbps
         loss: 0.05%
-    
+
     - endpoints: ["router-na-east:eth3", "router-edge:eth1"]
       vars:
         latency: 50ms
         bandwidth: 100mbps
         loss: 0.1%
-    
+
     - endpoints: ["router-eu:eth3", "router-edge:eth2"]
       vars:
         latency: 80ms
@@ -349,15 +349,15 @@ topology:
     # North America
     - endpoints: ["router-na-east:eth4", "node-na-bootstrap:eth1"]
     - endpoints: ["router-na-east:eth5", "node-na-mining:eth1"]
-    
+
     # Europe
     - endpoints: ["router-eu:eth4", "node-eu-institutional:eth1"]
     - endpoints: ["router-eu:eth5", "node-eu-research:eth1"]
-    
+
     # Asia Pacific
     - endpoints: ["router-ap:eth3", "node-ap-mobile:eth1"]
     - endpoints: ["router-ap:eth4", "node-ap-iot:eth1"]
-    
+
     # Edge network
     - endpoints: ["router-edge:eth3", "node-edge-rural:eth1"]
     - endpoints: ["router-edge:eth4", "node-edge-mobile:eth1"]

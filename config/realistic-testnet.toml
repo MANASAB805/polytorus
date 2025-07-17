@@ -13,7 +13,7 @@ peer_timeout = 300          # Longer timeout for satellite connections
 enable_discovery = true
 discovery_interval = 600    # Less frequent discovery for edge nodes
 max_message_size = 1048576  # 1MB max for satellite connections
-bandwidth_limit = null      # Will be set per node type
+# bandwidth_limit = null      # Will be set per node type
 
 # Network quality parameters (will be adjusted per region)
 [network.quality]

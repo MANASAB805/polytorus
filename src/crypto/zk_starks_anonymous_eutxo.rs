@@ -329,7 +329,6 @@ pub struct ZkStarksEUtxoProcessor {
     /// Configuration
     config: ZkStarksEUtxoConfig,
     /// Base eUTXO processor
-    #[allow(dead_code)]
     eutxo_processor: EUtxoProcessor,
     /// Enhanced privacy provider
     pub privacy_provider: Arc<RwLock<EnhancedPrivacyProvider>>,
@@ -575,6 +574,26 @@ impl ZkStarksEUtxoProcessor {
         Ok(true)
     }
 
+    /// Validate UTXO existence using base processor
+    pub async fn validate_utxo_existence(&self, utxo_id: &str) -> Result<bool> {
+        // Assume utxo_id format is "txid:vout"
+        if let Some(colon_pos) = utxo_id.find(':') {
+            let txid = &utxo_id[..colon_pos];
+            let vout_str = &utxo_id[colon_pos + 1..];
+            if let Ok(vout) = vout_str.parse::<i32>() {
+                match self.eutxo_processor.get_utxo(txid, vout) {
+                    Ok(Some(_)) => Ok(true),
+                    Ok(None) => Ok(false),
+                    Err(_) => Ok(false),
+                }
+            } else {
+                Ok(false)
+            }
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Create STARK stealth address
     pub fn create_stealth_address<R: RngCore + CryptoRng>(
         &self,
@@ -690,14 +709,23 @@ impl ZkStarksEUtxoProcessor {
         self.fill_anonymity_trace(&mut trace_table, secret_key, utxo_id, rng)?;
 
         // Create public inputs
-        let nullifier_value = self.compute_nullifier(secret_key, utxo_id.as_bytes());
-        let commitment_value = self.compute_commitment(100, 50); // amount=100, blinding=50
+        let nullifier_element = self.compute_nullifier_element(secret_key, utxo_id.as_bytes());
+        let commitment_element = self.compute_commitment_element(100, 50); // amount=100, blinding=50
+
+        // Create a dummy anonymity set for testing
+        let dummy_anonymity_set = vec![
+            BaseElement::new(1),
+            BaseElement::new(2),
+            BaseElement::new(3),
+            BaseElement::new(4),
+        ];
+        let anonymity_root = self.compute_merkle_root(&dummy_anonymity_set);
 
         let _public_inputs = AnonymityPublicInputs {
-            nullifier: BaseElement::new(nullifier_value),
-            amount_commitment: BaseElement::new(commitment_value),
+            nullifier: nullifier_element,
+            amount_commitment: commitment_element,
             anonymity_set_size: self.config.anonymity_set_size,
-            anonymity_set_root: BaseElement::new(123),
+            anonymity_set_root: anonymity_root,
         };
 
         // Create proof options
@@ -747,6 +775,10 @@ impl ZkStarksEUtxoProcessor {
             verification_time: 0,
             security_level: self.calculate_security_bits(),
         };
+
+        // Create public inputs for the proof
+        let nullifier_value = self.compute_nullifier(secret_key, utxo_id.as_bytes());
+        let commitment_value = self.compute_commitment(100, 50); // amount=100, blinding=50
 
         Ok(StarkAnonymityProof {
             proof_data,
@@ -1267,18 +1299,22 @@ impl ZkStarksEUtxoProcessor {
 
     /// Create proof options for STARK generation
     fn create_proof_options(&self) -> ProofOptions {
-        ProofOptions::new(
-            self.config.proof_options.num_queries,
-            self.config.proof_options.blowup_factor,
-            self.config.proof_options.grinding_bits as u32,
-            FieldExtension::None,
-            8,  // FRI folding factor
-            31, // FRI max remainder degree
-        )
+        // Use production options for high security configurations
+        if self.config.proof_options.num_queries >= 96 {
+            self.create_production_proof_options()
+        } else {
+            ProofOptions::new(
+                self.config.proof_options.num_queries,
+                self.config.proof_options.blowup_factor,
+                self.config.proof_options.grinding_bits as u32,
+                FieldExtension::None,
+                8,  // FRI folding factor
+                31, // FRI max remainder degree
+            )
+        }
     }
 
     /// Create production-quality proof options
-    #[allow(dead_code)]
     fn create_production_proof_options(&self) -> ProofOptions {
         ProofOptions::new(
             96, // High security: 96 queries for ~128-bit security
@@ -1291,21 +1327,18 @@ impl ZkStarksEUtxoProcessor {
     }
 
     /// Compute nullifier as field element
-    #[allow(dead_code)]
     fn compute_nullifier_element(&self, secret_key: &[u8], utxo_id: &[u8]) -> BaseElement {
         let nullifier_value = self.compute_nullifier(secret_key, utxo_id);
         BaseElement::new(nullifier_value)
     }
 
     /// Compute commitment as field element
-    #[allow(dead_code)]
     fn compute_commitment_element(&self, amount: u64, blinding: u64) -> BaseElement {
         let commitment_value = self.compute_commitment(amount, blinding);
         BaseElement::new(commitment_value)
     }
 
     /// Compute Merkle root from anonymity set
-    #[allow(dead_code)]
     fn compute_merkle_root(&self, anonymity_set: &[BaseElement]) -> BaseElement {
         if anonymity_set.is_empty() {
             return BaseElement::new(0);

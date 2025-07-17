@@ -165,7 +165,7 @@ curl http://127.0.0.1:8081/stats
 - セキュリティグループ: 以下のポート開放
   - SSH (22)
   - P2P (8000)
-  - HTTP API (8080) 
+  - HTTP API (8080)
   - RPC (8545)
   - Discovery (8900)
 

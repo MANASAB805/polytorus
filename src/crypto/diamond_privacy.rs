@@ -10,51 +10,31 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid;
 
+// Re-export the unified configuration
+pub use crate::crypto::enhanced_privacy::EnhancedPrivacyConfig as DiamondPrivacyConfig;
 use crate::{
     crypto::{
-        privacy::{PedersenCommitment, PrivacyConfig, PrivateTransaction, UtxoValidityProof},
-        real_diamond_io::{RealDiamondIOConfig, RealDiamondIOProvider},
+        enhanced_privacy::{DiamondCircuitComplexity, EnhancedPrivacyConfig},
+        privacy::{PedersenCommitment, PrivateTransaction, UtxoValidityProof},
+        real_diamond_io::RealDiamondIOProvider,
     },
     Result,
 };
 
-/// Enhanced privacy configuration that combines traditional privacy with Diamond IO
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiamondPrivacyConfig {
-    /// Base privacy configuration
-    pub privacy_config: PrivacyConfig,
-    /// Diamond IO configuration for circuit obfuscation
-    pub diamond_io_config: RealDiamondIOConfig,
-    /// Enable Diamond IO obfuscation for privacy circuits
-    pub enable_diamond_obfuscation: bool,
-    /// Enable hybrid privacy (traditional ZK + Diamond IO)
-    pub enable_hybrid_privacy: bool,
-    /// Circuit complexity level for Diamond IO
-    pub circuit_complexity: DiamondCircuitComplexity,
-}
+impl DiamondPrivacyConfig {
+    /// Create config with Diamond IO compatibility mapping
+    pub fn with_diamond_compatibility() -> Self {
+        EnhancedPrivacyConfig::default()
+    }
 
-/// Diamond IO circuit complexity levels for privacy operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DiamondCircuitComplexity {
-    /// Simple circuits for basic privacy operations
-    Simple,
-    /// Medium complexity for standard confidential transactions
-    Medium,
-    /// High complexity for advanced privacy with multiple proofs
-    High,
-    /// Maximum complexity for enterprise-grade privacy
-    Maximum,
-}
+    /// Check if Diamond obfuscation is enabled (maps to real Diamond IO)
+    pub fn enable_diamond_obfuscation(&self) -> bool {
+        self.enable_real_diamond_io
+    }
 
-impl Default for DiamondPrivacyConfig {
-    fn default() -> Self {
-        Self {
-            privacy_config: PrivacyConfig::default(),
-            diamond_io_config: RealDiamondIOConfig::testing(),
-            enable_diamond_obfuscation: false, // Disabled: DiamondIO only for smart contracts
-            enable_hybrid_privacy: false,      // Disabled: Use traditional privacy only
-            circuit_complexity: DiamondCircuitComplexity::Medium,
-        }
+    /// Check if hybrid privacy is enabled (maps to hybrid mode)
+    pub fn enable_hybrid_privacy(&self) -> bool {
+        self.use_hybrid_mode
     }
 }
 
@@ -121,7 +101,7 @@ impl DiamondPrivacyProvider {
         base_proof: UtxoValidityProof,
         circuit_inputs: &[u8],
     ) -> Result<DiamondPrivacyProof> {
-        if !self.config.enable_diamond_obfuscation {
+        if !self.config.enable_diamond_obfuscation() {
             return Err(anyhow::anyhow!("Diamond obfuscation not enabled"));
         }
 
@@ -166,7 +146,7 @@ impl DiamondPrivacyProvider {
         &mut self,
         proof: &DiamondPrivacyProof,
     ) -> Result<bool> {
-        if !self.config.enable_diamond_obfuscation {
+        if !self.config.enable_diamond_obfuscation() {
             // Fall back to traditional verification
             return self.verify_traditional_proof(&proof.backup_proof);
         }
@@ -175,7 +155,7 @@ impl DiamondPrivacyProvider {
         if proof.obfuscated_circuit.is_empty() || proof.evaluation_result.is_empty() {
             return Ok(false);
         } // If hybrid privacy is enabled, also verify traditional proof
-        if self.config.enable_hybrid_privacy
+        if self.config.enable_hybrid_privacy()
             && !self.verify_traditional_proof(&proof.backup_proof)?
         {
             return Ok(false);
@@ -353,7 +333,7 @@ impl DiamondPrivacyProvider {
         let mut hasher = Sha256::new();
         hasher.update(b"POLYTORUS_DIAMOND_PRIVACY_V1");
         hasher.update(format!("{:?}", self.config.circuit_complexity));
-        hasher.update([self.config.enable_diamond_obfuscation as u8]);
+        hasher.update([self.config.enable_diamond_obfuscation() as u8]);
         hasher.finalize().to_vec()
     }
 
@@ -366,11 +346,11 @@ impl DiamondPrivacyProvider {
         let mut metrics = HashMap::new();
         metrics.insert(
             "diamond_obfuscation_enabled".to_string(),
-            self.config.enable_diamond_obfuscation as u64,
+            self.config.enable_diamond_obfuscation() as u64,
         );
         metrics.insert(
             "hybrid_privacy_enabled".to_string(),
-            self.config.enable_hybrid_privacy as u64,
+            self.config.enable_hybrid_privacy() as u64,
         );
         metrics.insert(
             "security_level".to_string(),
@@ -386,8 +366,8 @@ impl DiamondPrivacyProvider {
     /// Get Diamond privacy statistics
     pub fn get_diamond_privacy_stats(&self) -> DiamondPrivacyStats {
         DiamondPrivacyStats {
-            diamond_obfuscation_enabled: self.config.enable_diamond_obfuscation,
-            hybrid_privacy_enabled: self.config.enable_hybrid_privacy,
+            diamond_obfuscation_enabled: self.config.enable_diamond_obfuscation(),
+            hybrid_privacy_enabled: self.config.enable_hybrid_privacy(),
             complexity_level: self.config.circuit_complexity.clone(),
             security_level: self.get_security_level_string(),
         }
@@ -435,7 +415,6 @@ mod tests {
             DiamondCircuitComplexity::Simple,
             DiamondCircuitComplexity::Medium,
             DiamondCircuitComplexity::High,
-            DiamondCircuitComplexity::Maximum,
         ] {
             config.circuit_complexity = complexity.clone();
             // Configuration should be valid for all complexity levels
@@ -444,7 +423,6 @@ mod tests {
                 DiamondCircuitComplexity::Simple
                     | DiamondCircuitComplexity::Medium
                     | DiamondCircuitComplexity::High
-                    | DiamondCircuitComplexity::Maximum
             ));
         }
     }
@@ -478,7 +456,7 @@ mod tests {
 
         // Test deserialization
         let deserialized: DiamondPrivacyConfig = serde_json::from_str(&serialized).unwrap();
-        assert!(!deserialized.enable_diamond_obfuscation); // Disabled by default now
-        assert!(!deserialized.enable_hybrid_privacy); // Disabled by default now
+        assert!(!deserialized.enable_diamond_obfuscation()); // Disabled by default now
+        assert!(!deserialized.enable_hybrid_privacy()); // Disabled by default now
     }
 }

@@ -79,16 +79,16 @@ echo "📊 Test 4: Log Analysis"
 if [ -f "logs/final-test.log" ]; then
     ERROR_COUNT=$(grep -i "error\|fail\|panic" logs/final-test.log 2>/dev/null | wc -l)
     NETWORK_COUNT=$(grep -i "network\|connect\|peer" logs/final-test.log 2>/dev/null | wc -l)
-    
+
     echo "  Log analysis:"
     echo "    Errors: $ERROR_COUNT"
     echo "    Network events: $NETWORK_COUNT"
-    
+
     if [ $ERROR_COUNT -gt 0 ]; then
         echo "    Recent errors:"
         grep -i "error\|fail\|panic" logs/final-test.log 2>/dev/null | tail -2 | sed 's/^/      /'
     fi
-    
+
     echo "    Last few lines:"
     tail -3 logs/final-test.log 2>/dev/null | sed 's/^/      /'
 else

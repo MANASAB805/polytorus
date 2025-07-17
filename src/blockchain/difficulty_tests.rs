@@ -1,10 +1,12 @@
 #[cfg(test)]
 mod difficulty_adjustment_tests {
-    use crate::blockchain::block::{
-        Block, DifficultyAdjustmentConfig, MiningStats, TestFinalizedParams,
+    use crate::{
+        blockchain::{
+            block::{Block, DifficultyAdjustmentConfig, MiningStats, TestFinalizedParams},
+            types::{block_states, network},
+        },
+        crypto::transaction::Transaction,
     };
-    use crate::blockchain::types::{block_states, network};
-    use crate::crypto::transaction::Transaction;
 
     fn create_test_transaction() -> Transaction {
         Transaction::new_coinbase("test_address".to_string(), "50".to_string()).unwrap()

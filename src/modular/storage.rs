@@ -546,7 +546,7 @@ impl ModularStorage {
         }
     }
 
-    /// Get block by hash  
+    /// Get block by hash
     pub async fn get_block_by_hash(
         &self,
         hash: &str,

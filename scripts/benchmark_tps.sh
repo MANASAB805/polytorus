@@ -45,18 +45,18 @@ echo
 if [ -d "target/criterion" ]; then
     echo "Quick TPS Summary:"
     echo "=================="
-    
+
     # Find the latest TPS results
     if [ -d "target/criterion/tps_throughput" ]; then
         echo "TPS with mining (latest results):"
         find target/criterion/tps_throughput -name "*.json" -exec grep -l "mean" {} \; | head -1 | xargs cat 2>/dev/null | grep -o '"mean":[0-9.]*' || echo "Results parsing requires manual inspection"
     fi
-    
+
     if [ -d "target/criterion/pure_transaction_tps" ]; then
         echo "Pure transaction processing TPS:"
         echo "See detailed results in HTML reports"
     fi
-    
+
     echo
     echo "For detailed analysis, open the HTML reports in your browser."
 fi

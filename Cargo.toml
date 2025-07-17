@@ -24,13 +24,23 @@ path = "examples/modular_architecture_simple.rs"
 name = "diamond_io_demo"
 path = "examples/diamond_io_demo.rs"
 
-[[example]]
-name = "multi_node_simulation"
-path = "examples/multi_node_simulation.rs"
+# Removed: multi_node_simulation.rs was deleted during refactoring
 
 [[example]]
-name = "transaction_monitor" 
+name = "transaction_monitor"
 path = "examples/transaction_monitor.rs"
+
+[[example]]
+name = "database_storage_demo"
+path = "examples/database_storage_demo.rs"
+
+[[example]]
+name = "failover_test_app"
+path = "examples/failover_test_app.rs"
+
+[[example]]
+name = "test_database_connection"
+path = "examples/test_database_connection.rs"
 
 [dependencies]
 # Cryptography - unified versions (modern alternatives)
@@ -83,6 +93,10 @@ tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json"] }
+
+# Database dependencies
+sqlx = { version = "0.8.1", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"] }
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 
 # Utilities
 uuid = { version = "1.16.0", features = ["v4", "serde"] }

@@ -11,10 +11,10 @@ echo "🔧 Starting advanced format string fixes..."
 fix_complex_println() {
     local file="$1"
     echo "  📝 Processing: $file"
-    
+
     # Create temporary file
     local tmp_file=$(mktemp)
-    
+
     # Process file line by line
     while IFS= read -r line; do
         # Fix single variable println patterns
@@ -39,7 +39,7 @@ fix_complex_println() {
             echo "$line" >> "$tmp_file"
         fi
     done < "$file"
-    
+
     # Replace original with fixed version
     mv "$tmp_file" "$file"
 }
@@ -47,19 +47,19 @@ fix_complex_println() {
 # Simple sed-based fixes for common patterns
 fix_simple_patterns() {
     local file="$1"
-    
+
     # Simple single-variable patterns
     sed -i 's/println!("\\([^"]*\\){}", \\([^)]*\\))/println!("\\1{\\2}")/g' "$file"
     sed -i 's/println!("\\([^"]*\\){:?}", \\([^)]*\\))/println!("\\1{\\2:?}")/g' "$file"
     sed -i 's/format!("\\([^"]*\\){}", \\([^)]*\\))/format!("\\1{\\2}")/g' "$file"
     sed -i 's/format!("\\([^"]*\\){:?}", \\([^)]*\\))/format!("\\1{\\2:?}")/g' "$file"
-    
+
     # Remove redundant tokio imports
     sed -i '/^use tokio;$/d' "$file"
-    
+
     # Fix vec! to arrays (simple cases only)
     sed -i 's/vec!\[true, false, true, false\]/[true, false, true, false]/g' "$file"
-    
+
     # Fix let unit values
     sed -i 's/let _result = \\([^;]*\\);/\\1;/g' "$file"
 }
@@ -67,7 +67,7 @@ fix_simple_patterns() {
 # Apply fixes based on clippy output analysis
 fix_specific_files() {
     echo "🎯 Applying specific file fixes..."
-    
+
     # Fix examples with format issues
     for example in examples/*.rs; do
         if [[ -f "$example" ]]; then
@@ -75,7 +75,7 @@ fix_specific_files() {
             fix_simple_patterns "$example"
         fi
     done
-    
+
     # Fix test files
     for test in tests/*.rs; do
         if [[ -f "$test" ]]; then
@@ -83,7 +83,7 @@ fix_specific_files() {
             fix_simple_patterns "$test"
         fi
     done
-    
+
     # Fix benchmark files
     for bench in benches/*.rs; do
         if [[ -f "$bench" ]]; then

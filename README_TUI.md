@@ -13,7 +13,7 @@ A beautiful and powerful Terminal User Interface for the Polytorus blockchain pl
 ### 💰 Transaction Focus
 - **Interactive Transaction Form**: Step-by-step transaction creation
 - **Real-time Validation**: Address and amount validation
-- **Balance Checking**: Insufficient balance detection  
+- **Balance Checking**: Insufficient balance detection
 - **Transaction History**: View sent and received transactions
 - **Status Tracking**: Pending, confirmed, and failed states
 
@@ -156,7 +156,7 @@ The TUI respects all existing Polytorus configuration:
 ## Dependencies
 
 - **ratatui**: Terminal UI framework
-- **crossterm**: Cross-platform terminal handling  
+- **crossterm**: Cross-platform terminal handling
 - **tokio**: Async runtime for blockchain integration
 - **chrono**: Date and time formatting
 - **anyhow**: Error handling

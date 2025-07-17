@@ -24,12 +24,10 @@ use super::{
 
 /// WASM contract execution engine implementing unified interface
 pub struct WasmContractEngine {
-    #[allow(dead_code)]
     engine: Engine,
     storage: Arc<dyn ContractStateStorage>,
     gas_manager: UnifiedGasManager,
     erc20_contracts: Arc<Mutex<HashMap<String, ERC20Contract>>>,
-    #[allow(dead_code)]
     gas_config: GasConfig,
 }
 
@@ -150,19 +148,30 @@ impl WasmContractEngine {
                     ]);
 
                     match contract.transfer(caller, &to, amount) {
-                        Ok(_) => {
-                            events.push(ContractEvent {
-                                contract_address: contract_address.to_string(),
-                                event_type: "Transfer".to_string(),
-                                topics: vec![caller.to_string(), to],
-                                data: amount.to_be_bytes().to_vec(),
-                                timestamp: std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs(),
-                            });
-                            return_data = vec![1]; // Success
-                            Ok(())
+                        Ok(result) => {
+                            if result.success {
+                                events.push(ContractEvent {
+                                    contract_address: contract_address.to_string(),
+                                    event_type: "Transfer".to_string(),
+                                    topics: vec![caller.to_string(), to],
+                                    data: amount.to_be_bytes().to_vec(),
+                                    timestamp: std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs(),
+                                });
+                                return_data = vec![1]; // Success
+                                Ok(())
+                            } else {
+                                success = false;
+                                error_message =
+                                    Some(String::from_utf8_lossy(&result.return_value).to_string());
+                                return_data = vec![0]; // Failure
+                                Err(anyhow::anyhow!(String::from_utf8_lossy(
+                                    &result.return_value
+                                )
+                                .to_string()))
+                            }
                         }
                         Err(e) => {
                             success = false;
@@ -207,24 +216,120 @@ impl WasmContractEngine {
                         input_data[39],
                     ]);
 
-                    contract.approve(caller, &spender, amount)?;
-
-                    events.push(ContractEvent {
-                        contract_address: contract_address.to_string(),
-                        event_type: "Approval".to_string(),
-                        topics: vec![caller.to_string(), spender],
-                        data: amount.to_be_bytes().to_vec(),
-                        timestamp: std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs(),
-                    });
-
-                    return_data = vec![1]; // Success
-                    Ok(())
+                    match contract.approve(caller, &spender, amount) {
+                        Ok(result) => {
+                            if result.success {
+                                events.push(ContractEvent {
+                                    contract_address: contract_address.to_string(),
+                                    event_type: "Approval".to_string(),
+                                    topics: vec![caller.to_string(), spender],
+                                    data: amount.to_be_bytes().to_vec(),
+                                    timestamp: std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs(),
+                                });
+                                return_data = vec![1]; // Success
+                                Ok(())
+                            } else {
+                                success = false;
+                                error_message =
+                                    Some(String::from_utf8_lossy(&result.return_value).to_string());
+                                return_data = vec![0]; // Failure
+                                Err(anyhow::anyhow!(String::from_utf8_lossy(
+                                    &result.return_value
+                                )
+                                .to_string()))
+                            }
+                        }
+                        Err(e) => {
+                            success = false;
+                            error_message = Some(e.to_string());
+                            return_data = vec![0]; // Failure
+                            Err(e)
+                        }
+                    }
                 } else {
                     success = false;
                     error_message = Some("Invalid input data for approve".to_string());
+                    Err(anyhow::anyhow!("Invalid input data"))
+                }
+            }
+            "allowance" => {
+                if input_data.len() >= 64 {
+                    // 32 bytes for owner address + 32 bytes for spender address
+                    let owner = String::from_utf8_lossy(&input_data[0..32])
+                        .trim_end_matches('\0')
+                        .to_string();
+                    let spender = String::from_utf8_lossy(&input_data[32..64])
+                        .trim_end_matches('\0')
+                        .to_string();
+                    let allowance = contract.allowance(&owner, &spender);
+                    return_data = allowance.to_be_bytes().to_vec();
+                    Ok(())
+                } else {
+                    success = false;
+                    error_message = Some("Invalid input data for allowance".to_string());
+                    Err(anyhow::anyhow!("Invalid input data"))
+                }
+            }
+            "transferFrom" => {
+                if input_data.len() >= 72 {
+                    // 32 bytes for from address + 32 bytes for to address + 8 bytes for amount
+                    let from = String::from_utf8_lossy(&input_data[0..32])
+                        .trim_end_matches('\0')
+                        .to_string();
+                    let to = String::from_utf8_lossy(&input_data[32..64])
+                        .trim_end_matches('\0')
+                        .to_string();
+                    let amount = u64::from_be_bytes([
+                        input_data[64],
+                        input_data[65],
+                        input_data[66],
+                        input_data[67],
+                        input_data[68],
+                        input_data[69],
+                        input_data[70],
+                        input_data[71],
+                    ]);
+
+                    match contract.transfer_from(caller, &from, &to, amount) {
+                        Ok(result) => {
+                            if result.success {
+                                events.push(ContractEvent {
+                                    contract_address: contract_address.to_string(),
+                                    event_type: "Transfer".to_string(),
+                                    topics: vec![from.clone(), to.clone()],
+                                    data: amount.to_be_bytes().to_vec(),
+                                    timestamp: std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs(),
+                                });
+
+                                return_data = vec![1]; // Success
+                                Ok(())
+                            } else {
+                                success = false;
+                                error_message =
+                                    Some(String::from_utf8_lossy(&result.return_value).to_string());
+                                return_data = vec![0]; // Failure
+                                Err(anyhow::anyhow!(String::from_utf8_lossy(
+                                    &result.return_value
+                                )
+                                .to_string()))
+                            }
+                        }
+                        Err(e) => {
+                            success = false;
+                            error_message = Some(e.to_string());
+                            return_data = vec![0]; // Failure
+                            Err(e)
+                        }
+                    }
+                } else {
+                    success = false;
+                    error_message = Some("Invalid input data for transferFrom".to_string());
                     Err(anyhow::anyhow!("Invalid input data"))
                 }
             }
@@ -268,7 +373,9 @@ impl WasmContractEngine {
             0
         };
 
-        let gas_used = base_gas + computation_gas + storage_gas;
+        // Apply gas config adjustments
+        let function_call_gas = self.gas_config.function_call_cost;
+        let gas_used = base_gas + computation_gas + storage_gas + function_call_gas;
 
         Ok(UnifiedContractResult {
             success,
@@ -481,6 +588,9 @@ impl UnifiedContractEngine for WasmContractEngine {
     }
 
     fn engine_info(&self) -> EngineInfo {
+        // Use engine configuration for additional info
+        let _engine_config = self.engine.config();
+
         EngineInfo {
             name: "WASM Contract Engine".to_string(),
             version: "1.0.0".to_string(),
@@ -490,6 +600,7 @@ impl UnifiedContractEngine for WasmContractEngine {
                 "Gas Metering".to_string(),
                 "Event System".to_string(),
                 "State Persistence".to_string(),
+                format!("Max Gas: {}", self.gas_config.max_gas_per_call),
             ],
         }
     }
@@ -499,12 +610,12 @@ impl UnifiedContractEngine for WasmContractEngine {
 mod tests {
     use super::*;
     use crate::smart_contract::{
+        unified_contract_storage::SyncInMemoryContractStorage,
         unified_engine::{UnifiedGasConfig, UnifiedGasManager},
-        unified_storage::SyncInMemoryContractStorage,
     };
 
     fn create_test_engine() -> WasmContractEngine {
-        let storage = Arc::new(SyncInMemoryContractStorage::new());
+        let storage = Arc::new(SyncInMemoryContractStorage::new_sync_memory());
         let gas_manager = UnifiedGasManager::new(UnifiedGasConfig::default());
         WasmContractEngine::new(storage, gas_manager).unwrap()
     }

@@ -10,6 +10,25 @@ use num_traits::Num;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
+/// Circuit types for privacy operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CircuitType {
+    Cryptographic,
+    Logic,
+    Arithmetic,
+}
+
+/// Privacy circuit definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrivacyCircuit {
+    pub id: String,
+    pub description: String,
+    pub input_size: usize,
+    pub output_size: usize,
+    pub topology: Option<String>,
+    pub circuit_type: CircuitType,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyEngineConfig {
     /// Ring dimension (must be power of 2)
@@ -440,6 +459,20 @@ impl PrivacyEngineIntegration {
         Ok(result)
     }
 
+    /// Get the configuration
+    pub fn config(&self) -> &PrivacyEngineConfig {
+        &self.config
+    }
+
+    /// Execute circuit with given circuit ID and inputs
+    pub async fn execute_circuit(
+        &self,
+        _circuit_id: &str,
+        inputs: Vec<bool>,
+    ) -> anyhow::Result<Vec<bool>> {
+        self.evaluate_circuit(&inputs).await
+    }
+
     /// Execute circuit and return detailed result
     pub async fn execute_circuit_detailed(
         &self,
@@ -686,11 +719,6 @@ impl PrivacyEngineIntegration {
     /// Set the obfuscation directory
     pub fn set_obfuscation_dir(&mut self, dir: String) {
         self.obfuscation_dir = dir;
-    }
-
-    /// Get configuration
-    pub fn config(&self) -> &PrivacyEngineConfig {
-        &self.config
     }
 
     /// Get parameters

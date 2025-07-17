@@ -34,17 +34,17 @@ bootstrap_peers = []
 max_peers = 50
 connection_timeout = 10     # seconds
 ping_interval = 30          # seconds
-peer_timeout = 120          # seconds  
+peer_timeout = 120          # seconds
 enable_discovery = true
 discovery_interval = 300    # seconds (5 minutes)
 max_message_size = 10485760 # 10MB
-bandwidth_limit = null      # null = unlimited
+bandwidth_limit = 0         # 0 = unlimited
 
 # Logging Configuration
 [logging]
 level = "INFO"              # DEBUG, INFO, WARN, ERROR
 output = "console"          # console, file, both
-file_path = null            # null = no file logging
+# file_path = null            # null = no file logging
 max_file_size = 104857600   # 100MB
 rotation_count = 5
 

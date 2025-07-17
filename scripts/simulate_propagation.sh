@@ -65,22 +65,22 @@ START_TIME=$(date +%s)
 while true; do
     CURRENT_TIME=$(date +%s)
     ELAPSED=$((CURRENT_TIME - START_TIME))
-    
+
     if [[ $ELAPSED -ge $SIMULATION_TIME ]]; then
         break
     fi
-    
+
     # Generate random transaction
     FROM_NODE=$((RANDOM % NUM_NODES))
     TO_NODE=$(((RANDOM % (NUM_NODES - 1) + FROM_NODE + 1) % NUM_NODES))
     AMOUNT=$((100 + RANDOM % 900))
-    
+
     FROM_PORT=$((BASE_PORT + FROM_NODE))
     TO_PORT=$((BASE_PORT + TO_NODE))
-    
+
     # Transaction data
     TRANSACTION_DATA="{\"from\":\"wallet_node-$FROM_NODE\",\"to\":\"wallet_node-$TO_NODE\",\"amount\":$AMOUNT,\"nonce\":$TRANSACTION_COUNT}"
-    
+
     # Step 1: Submit to sender node's /send endpoint (records as sent)
     SEND_SUCCESS=false
     if curl -s -X POST \
@@ -89,7 +89,7 @@ while true; do
         "http://127.0.0.1:$FROM_PORT/send" > /dev/null 2>&1; then
         SEND_SUCCESS=true
     fi
-    
+
     # Step 2: Submit to receiver node's /transaction endpoint (records as received)
     RECV_SUCCESS=false
     if curl -s -X POST \
@@ -98,7 +98,7 @@ while true; do
         "http://127.0.0.1:$TO_PORT/transaction" > /dev/null 2>&1; then
         RECV_SUCCESS=true
     fi
-    
+
     # Report transaction status
     if [[ "$SEND_SUCCESS" == true && "$RECV_SUCCESS" == true ]]; then
         echo -e "   💸 TX $TRANSACTION_COUNT: Node $FROM_NODE ➜ Node $TO_NODE (${AMOUNT}) ✅"
@@ -109,14 +109,14 @@ while true; do
     else
         echo -e "   ❌ TX $TRANSACTION_COUNT: Node $FROM_NODE ➜ Node $TO_NODE (${AMOUNT}) - Both failed"
     fi
-    
+
     TRANSACTION_COUNT=$((TRANSACTION_COUNT + 1))
-    
+
     # Progress report every 5 transactions
     if [[ $((TRANSACTION_COUNT % 5)) -eq 0 ]]; then
         echo -e "   📊 Progress: ${TRANSACTION_COUNT} transactions, ${ELAPSED}/${SIMULATION_TIME}s elapsed"
     fi
-    
+
     sleep $TX_INTERVAL
 done
 
@@ -131,7 +131,7 @@ echo -e "${BLUE}📈 Final Complete Propagation Statistics:${NC}"
 for ((i=0; i<NUM_NODES; i++)); do
     PORT=$((BASE_PORT + i))
     echo -e "   Node $i (port $PORT):"
-    
+
     # Get detailed stats
     STATS=$(curl -s "http://127.0.0.1:$PORT/stats" 2>/dev/null)
     if [[ $? -eq 0 && -n "$STATS" ]]; then

@@ -104,7 +104,7 @@ echo "📊 Checking transaction statistics..."
 for port in 9701 9702; do
     node_num=$((port - 9700))
     echo "Node $node_num statistics:"
-    
+
     STATS=$(timeout 3 curl -s "http://127.0.0.1:$port/stats" 2>/dev/null || echo "Unavailable")
     echo "  $STATS"
 done
@@ -117,11 +117,11 @@ for log in logs/p2p-node1.log logs/p2p-node2.log; do
     if [ -f "$log" ]; then
         node_name=$(basename "$log" .log)
         echo "$node_name:"
-        
+
         # Look for network/P2P related activity
         NETWORK_LINES=$(grep -i "network\|p2p\|peer\|connect" "$log" 2>/dev/null | wc -l)
         echo "  Network activity lines: $NETWORK_LINES"
-        
+
         # Look for errors
         ERROR_LINES=$(grep -i "error\|fail\|panic" "$log" 2>/dev/null | wc -l)
         if [ $ERROR_LINES -gt 0 ]; then
@@ -130,7 +130,7 @@ for log in logs/p2p-node1.log logs/p2p-node2.log; do
         else
             echo "  ✅ No errors"
         fi
-        
+
         # Show recent activity
         echo "  Recent activity:"
         tail -3 "$log" 2>/dev/null | sed 's/^/    /'

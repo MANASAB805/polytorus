@@ -677,7 +677,7 @@ EOF
 cp config/testnet/node1.toml config/testnet/node2.toml
 sed -i 's/8001/8002/g' config/testnet/node2.toml
 
-cp config/testnet/node1.toml config/testnet/node3.toml  
+cp config/testnet/node1.toml config/testnet/node3.toml
 sed -i 's/8001/8003/g' config/testnet/node3.toml
 
 cp config/testnet/node1.toml config/testnet/node4.toml
@@ -834,7 +834,7 @@ pub struct BootstrapManager {
 # 1. ノード起動テスト
 ./scripts/test_node_startup.sh
 
-# 2. P2P接続テスト  
+# 2. P2P接続テスト
 ./scripts/test_p2p_connectivity.sh
 
 # 3. トランザクション伝播テスト
@@ -936,7 +936,7 @@ PolyTorusは**現在でも高品質なプライベートテストネット**の�
 
 **推奨されるアプローチ:**
 1. **Phase 1 (即座)**: プライベートコンソーシアムテストネット
-2. **Phase 2 (2-4週間)**: セミプライベートテストネット  
+2. **Phase 2 (2-4週間)**: セミプライベートテストネット
 3. **Phase 3 (1-2ヶ月)**: パブリックテストネット
 
 この段階的アプローチにより、リスクを最小化しながら確実にテストネットを公開できます。

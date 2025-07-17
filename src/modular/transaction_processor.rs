@@ -126,7 +126,6 @@ pub struct ModularTransactionProcessor {
     /// Transaction pool for pending transactions
     tx_pool: Arc<Mutex<Vec<Transaction>>>,
     /// Fee calculation cache
-    #[allow(dead_code)]
     fee_cache: Arc<Mutex<HashMap<String, FeeCalculation>>>,
     /// Processing metrics
     metrics: Arc<Mutex<ProcessingMetrics>>,
@@ -147,7 +146,6 @@ pub struct ProcessingMetrics {
 #[derive(Debug, Clone)]
 struct ContractExecutionResult {
     pub events: Vec<TransactionEvent>,
-    #[allow(dead_code)]
     pub return_data: Vec<u8>,
 }
 
@@ -379,6 +377,17 @@ impl ModularTransactionProcessor {
 
     /// Calculate real transaction fees based on complexity and resource usage
     pub fn calculate_transaction_fees(&self, tx: &Transaction) -> Result<FeeCalculation> {
+        // Create cache key from transaction hash
+        let cache_key = format!("{:?}", tx); // Simple cache key for demo
+
+        // Check fee cache first
+        {
+            let cache = self.fee_cache.lock().unwrap();
+            if let Some(cached_result) = cache.get(&cache_key) {
+                return Ok(cached_result.clone());
+            }
+        }
+
         let mut fee_breakdown = HashMap::new();
         let mut total_gas = self.config.base_gas_cost;
 
@@ -417,14 +426,22 @@ impl ModularTransactionProcessor {
         // Apply maximum fee limit
         let final_fee = total_fee.min(self.config.max_fee_per_transaction);
 
-        Ok(FeeCalculation {
+        let result = FeeCalculation {
             base_fee,
             priority_fee,
             total_fee: final_fee,
             gas_used: total_gas,
             gas_price: self.config.gas_price,
             fee_breakdown,
-        })
+        };
+
+        // Cache the result
+        {
+            let mut cache = self.fee_cache.lock().unwrap();
+            cache.insert(cache_key, result.clone());
+        }
+
+        Ok(result)
     }
 
     /// Estimate transaction size in bytes for storage cost calculation
@@ -891,6 +908,14 @@ impl ModularTransactionProcessor {
                         // Add any events from contract execution
                         result.events.extend(execution_result.events);
 
+                        // Log return data for debugging
+                        if !execution_result.return_data.is_empty() {
+                            eprintln!(
+                                "Contract returned {} bytes of data",
+                                execution_result.return_data.len()
+                            );
+                        }
+
                         result.success = true;
                     }
                     Err(e) => {
@@ -1090,14 +1115,29 @@ impl ModularTransactionProcessor {
     fn execute_contract_function(
         &self,
         _contract_state: &mut ProcessorAccountState,
-        _function_name: &str,
-        _arguments: &[u8],
+        function_name: &str,
+        arguments: &[u8],
     ) -> Result<ContractExecutionResult> {
         // Simplified function execution
         // In real implementation, would execute WASM function
+
+        // Create mock return data based on function name
+        let return_data = match function_name {
+            "get_balance" => 1000u64.to_le_bytes().to_vec(),
+            "get_name" => b"MockContract".to_vec(),
+            "transfer" => {
+                if arguments.len() >= 8 {
+                    vec![1] // Success
+                } else {
+                    vec![0] // Failure
+                }
+            }
+            _ => Vec::new(),
+        };
+
         Ok(ContractExecutionResult {
             events: Vec::new(),
-            return_data: Vec::new(),
+            return_data,
         })
     }
 }

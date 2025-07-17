@@ -43,7 +43,7 @@ print_help() {
     echo ""
     echo -e "${YELLOW}Local Options:${NC}"
     echo -e "  --nodes <N>       Number of nodes (default: 4)"
-    echo -e "  --duration <S>    Simulation duration in seconds (default: 300)"  
+    echo -e "  --duration <S>    Simulation duration in seconds (default: 300)"
     echo -e "  --interval <MS>   Transaction interval in milliseconds (default: 5000)"
     echo -e "  --base-port <P>   Base HTTP port (default: 9000)"
     echo -e "  --p2p-port <P>    Base P2P port (default: 8000)"
@@ -58,24 +58,24 @@ print_help() {
 
 check_dependencies() {
     local missing_deps=()
-    
+
     # Check for required tools
     if ! command -v cargo &> /dev/null; then
         missing_deps+=("cargo (Rust)")
     fi
-    
+
     if [[ "$1" == "docker" ]] && ! command -v docker &> /dev/null; then
         missing_deps+=("docker")
     fi
-    
+
     if [[ "$1" == "docker" ]] && ! command -v docker-compose &> /dev/null; then
         missing_deps+=("docker-compose")
     fi
-    
+
     if ! command -v curl &> /dev/null; then
         missing_deps+=("curl")
     fi
-    
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         echo -e "${RED}❌ Missing dependencies:${NC}"
         for dep in "${missing_deps[@]}"; do
@@ -90,7 +90,7 @@ check_dependencies() {
 build_project() {
     echo -e "${BLUE}🔨 Building PolyTorus...${NC}"
     cd "$PROJECT_DIR"
-    
+
     if cargo build --release; then
         echo -e "${GREEN}✅ Build successful${NC}"
     else
@@ -105,7 +105,7 @@ run_local_simulation() {
     local interval=5000
     local base_port=9000
     local p2p_port=8000
-    
+
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -135,7 +135,7 @@ run_local_simulation() {
                 ;;
         esac
     done
-    
+
     print_header
     echo -e "${CYAN}🚀 Starting Local Multi-Node Simulation${NC}"
     echo -e "   Nodes: $nodes"
@@ -144,10 +144,10 @@ run_local_simulation() {
     echo -e "   Base Port: $base_port"
     echo -e "   P2P Port: $p2p_port"
     echo ""
-    
+
     check_dependencies "local"
     build_project
-    
+
     # Run local simulation script
     "$SCRIPT_DIR/multi_node_simulation.sh" "$nodes" "$base_port" "$p2p_port" "$duration"
 }
@@ -155,11 +155,11 @@ run_local_simulation() {
 run_docker_simulation() {
     print_header
     echo -e "${CYAN}🐳 Starting Docker Multi-Node Simulation${NC}"
-    
+
     check_dependencies "docker"
-    
+
     cd "$PROJECT_DIR"
-    
+
     echo -e "${BLUE}📦 Building Docker images...${NC}"
     if docker-compose build; then
         echo -e "${GREEN}✅ Docker images built successfully${NC}"
@@ -167,7 +167,7 @@ run_docker_simulation() {
         echo -e "${RED}❌ Docker build failed${NC}"
         exit 1
     fi
-    
+
     echo -e "${BLUE}🚀 Starting containers...${NC}"
     docker-compose up --remove-orphans
 }
@@ -176,7 +176,7 @@ run_rust_simulation() {
     local nodes=4
     local duration=300
     local interval=5000
-    
+
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -198,17 +198,17 @@ run_rust_simulation() {
                 ;;
         esac
     done
-    
+
     print_header
     echo -e "${CYAN}🦀 Starting Rust Multi-Node Simulation${NC}"
     echo -e "   Nodes: $nodes"
     echo -e "   Duration: ${duration}s"
     echo -e "   TX Interval: ${interval}ms"
     echo ""
-    
+
     check_dependencies "rust"
     build_project
-    
+
     cd "$PROJECT_DIR"
     cargo run --example multi_node_simulation -- \
         --nodes "$nodes" \
@@ -220,7 +220,7 @@ show_status() {
     print_header
     echo -e "${CYAN}📊 Simulation Status${NC}"
     echo ""
-    
+
     # Check for running processes
     if pgrep -f "polytorus" > /dev/null; then
         echo -e "${GREEN}✅ PolyTorus processes running:${NC}"
@@ -230,9 +230,9 @@ show_status() {
     else
         echo -e "${YELLOW}⚠️  No PolyTorus processes found${NC}"
     fi
-    
+
     echo ""
-    
+
     # Check Docker containers
     if command -v docker &> /dev/null; then
         if docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -q "polytorus"; then
@@ -242,9 +242,9 @@ show_status() {
             echo -e "${YELLOW}⚠️  No PolyTorus Docker containers found${NC}"
         fi
     fi
-    
+
     echo ""
-    
+
     # Check for API endpoints
     echo -e "${BLUE}🌐 Checking API endpoints:${NC}"
     for port in {9000..9005}; do
@@ -257,7 +257,7 @@ show_status() {
 stop_simulation() {
     print_header
     echo -e "${CYAN}🛑 Stopping All Simulations${NC}"
-    
+
     # Stop shell script processes
     if [[ -f "/tmp/polytorus_pids.txt" ]]; then
         echo -e "${BLUE}Stopping shell script processes...${NC}"
@@ -269,49 +269,49 @@ stop_simulation() {
         done < "/tmp/polytorus_pids.txt"
         rm -f "/tmp/polytorus_pids.txt"
     fi
-    
+
     # Stop all polytorus processes
     if pgrep -f "polytorus" > /dev/null; then
         echo -e "${BLUE}Stopping PolyTorus processes...${NC}"
         pkill -f "polytorus" || true
     fi
-    
+
     # Stop Docker containers
     if command -v docker-compose &> /dev/null && [[ -f "$PROJECT_DIR/docker-compose.yml" ]]; then
         echo -e "${BLUE}Stopping Docker containers...${NC}"
         cd "$PROJECT_DIR"
         docker-compose down --remove-orphans
     fi
-    
+
     echo -e "${GREEN}✅ All simulations stopped${NC}"
 }
 
 clean_data() {
     print_header
     echo -e "${CYAN}🧹 Cleaning Simulation Data${NC}"
-    
+
     # Stop everything first
     stop_simulation
-    
+
     # Clean data directories
     if [[ -d "$PROJECT_DIR/data/simulation" ]]; then
         echo -e "${BLUE}Removing simulation data...${NC}"
         rm -rf "$PROJECT_DIR/data/simulation"
         echo -e "   ✅ Simulation data removed"
     fi
-    
+
     # Clean Docker volumes
     if command -v docker &> /dev/null; then
         echo -e "${BLUE}Cleaning Docker volumes...${NC}"
         docker volume ls -q | grep -E "(polytorus|simulation)" | xargs -r docker volume rm || true
     fi
-    
+
     # Clean logs
     if [[ -d "$PROJECT_DIR/logs" ]]; then
         echo -e "${BLUE}Cleaning logs...${NC}"
         find "$PROJECT_DIR/logs" -name "*.log" -delete || true
     fi
-    
+
     echo -e "${GREEN}✅ Cleanup completed${NC}"
 }
 
@@ -319,7 +319,7 @@ show_logs() {
     print_header
     echo -e "${CYAN}📋 Simulation Logs${NC}"
     echo ""
-    
+
     # Show log files if they exist
     if [[ -d "$PROJECT_DIR/data/simulation" ]]; then
         echo -e "${BLUE}Available log files:${NC}"
@@ -327,14 +327,14 @@ show_logs() {
             file_size=$(du -h "$log_file" | cut -f1)
             echo -e "   📄 $log_file ($file_size)"
         done
-        
+
         echo ""
         echo -e "${YELLOW}Recent log entries:${NC}"
         find "$PROJECT_DIR/data/simulation" -name "*.log" -type f -exec tail -n 5 {} \; -exec echo "" \;
     else
         echo -e "${YELLOW}No simulation logs found${NC}"
     fi
-    
+
     # Show Docker logs if containers are running
     if command -v docker &> /dev/null; then
         docker ps --format "{{.Names}}" | grep -E "polytorus" | while read -r container; do

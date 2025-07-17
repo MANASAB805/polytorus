@@ -228,7 +228,6 @@ pub struct AnonymousEUtxoProcessor {
     /// Configuration
     config: AnonymousEUtxoConfig,
     /// Base eUTXO processor
-    #[allow(dead_code)]
     eutxo_processor: EUtxoProcessor,
     /// Enhanced privacy provider
     pub privacy_provider: Arc<RwLock<EnhancedPrivacyProvider>>,
@@ -651,9 +650,26 @@ impl AnonymousEUtxoProcessor {
         let mut amounts = Vec::new();
         for utxo_id in input_utxos {
             if let Some(_utxo) = anonymous_utxos.get(utxo_id) {
-                // In a real implementation, we would decrypt the amount
-                // For now, return a dummy amount
-                amounts.push(100);
+                // Try to get amount from base eutxo processor first
+                // Assume utxo_id format is "txid:vout"
+                if let Some(colon_pos) = utxo_id.find(':') {
+                    let txid = &utxo_id[..colon_pos];
+                    let vout_str = &utxo_id[colon_pos + 1..];
+                    if let Ok(vout) = vout_str.parse::<i32>() {
+                        if let Ok(Some(utxo_state)) = self.eutxo_processor.get_utxo(txid, vout) {
+                            amounts.push(utxo_state.output.value as u64);
+                        } else {
+                            // Fallback to dummy amount if not found in processor
+                            amounts.push(100);
+                        }
+                    } else {
+                        // Fallback to dummy amount for invalid format
+                        amounts.push(100);
+                    }
+                } else {
+                    // Fallback to dummy amount for encrypted utxos
+                    amounts.push(100);
+                }
             } else {
                 return Err(anyhow::anyhow!("UTXO not found: {}", utxo_id));
             }

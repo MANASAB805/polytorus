@@ -6,6 +6,7 @@
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use anyhow::Result;
+use diamond_io::bgg::circuit::PolyCircuit;
 use uuid::Uuid;
 
 use super::unified_engine::{
@@ -13,7 +14,7 @@ use super::unified_engine::{
     UnifiedContractEngine, UnifiedContractExecution, UnifiedContractMetadata,
     UnifiedContractResult, UnifiedGasManager,
 };
-use crate::diamond_io_integration::{
+use crate::diamond_io_integration_unified::{
     PrivacyCircuit, PrivacyEngineConfig, PrivacyEngineIntegration,
 };
 
@@ -22,7 +23,7 @@ pub struct PrivacyContractEngine {
     storage: Arc<dyn ContractStateStorage>,
     gas_manager: UnifiedGasManager,
     privacy_engine: PrivacyEngineIntegration,
-    active_circuits: HashMap<String, PrivacyCircuit>,
+    active_circuits: HashMap<String, PolyCircuit>,
 }
 
 impl PrivacyContractEngine {
@@ -51,22 +52,25 @@ impl PrivacyContractEngine {
         let contract_address = metadata.address.clone();
 
         // Create privacy circuit
-        let circuit = self.privacy_engine.create_demo_circuit();
+        let poly_circuit = self.privacy_engine.create_demo_circuit();
 
         // Store circuit in engine
         self.active_circuits
-            .insert(contract_address.clone(), circuit.clone());
+            .insert(contract_address.clone(), poly_circuit);
 
         // Store metadata
         self.storage.store_contract_metadata(&metadata)?;
 
-        // Store circuit information
-        let circuit_data = bincode::serialize(&CircuitInfo {
-            id: circuit.id.clone(),
-            description: circuit.description.clone(),
-            input_size: circuit.input_size,
-            output_size: circuit.output_size,
-        })?;
+        // Create serializable circuit metadata
+        let circuit_metadata = PrivacyCircuit {
+            id: contract_address.clone(),
+            description: "Privacy enhanced contract".to_string(),
+            input_size: self.privacy_engine.config().input_size,
+            output_size: 1, // Default output size
+            topology: None,
+            circuit_type: crate::diamond_io_integration_unified::CircuitType::Cryptographic,
+        };
+        let circuit_data = bincode::serialize(&circuit_metadata)?;
 
         self.storage
             .set_contract_state(&contract_address, "circuit_info", &circuit_data)?;
@@ -99,11 +103,9 @@ impl PrivacyContractEngine {
         let start_time = Instant::now();
 
         // Load circuit information
-        let circuit = self
-            .active_circuits
-            .get(contract_address)
-            .ok_or_else(|| anyhow::anyhow!("Circuit not found for contract: {}", contract_address))?
-            .clone();
+        let circuit = self.load_circuit(contract_address)?.ok_or_else(|| {
+            anyhow::anyhow!("Circuit not found for contract: {}", contract_address)
+        })?;
 
         let mut events = Vec::new();
         let mut return_data = Vec::new();
@@ -117,10 +119,10 @@ impl PrivacyContractEngine {
         let _result = match function_name {
             "evaluate" => {
                 // Direct circuit evaluation
-                match self
-                    .privacy_engine
-                    .execute_circuit(&circuit.id, circuit_inputs)
-                {
+                match tokio::runtime::Handle::current().block_on(
+                    self.privacy_engine
+                        .execute_circuit_detailed(&circuit_inputs),
+                ) {
                     Ok(eval_result) => {
                         return_data = self.convert_bools_to_bytes(&eval_result.outputs);
 
@@ -150,46 +152,48 @@ impl PrivacyContractEngine {
             }
             "obfuscate" => {
                 // Re-obfuscate the circuit
-                match tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(self.privacy_engine.obfuscate_circuit(circuit.clone()))
-                }) {
-                    Ok(_) => {
-                        // Update obfuscation status
-                        self.storage
-                            .set_contract_state(contract_address, "obfuscated", &[1])?;
+                if let Some(poly_circuit) = self.get_poly_circuit(contract_address) {
+                    match tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current()
+                            .block_on(self.privacy_engine.obfuscate_circuit(poly_circuit.clone()))
+                    }) {
+                        Ok(_) => {
+                            // Update obfuscation status
+                            self.storage.set_contract_state(
+                                contract_address,
+                                "obfuscated",
+                                &[1],
+                            )?;
 
-                        events.push(ContractEvent {
-                            contract_address: contract_address.to_string(),
-                            event_type: "CircuitObfuscated".to_string(),
-                            topics: vec![caller.to_string()],
-                            data: Vec::new(),
-                            timestamp: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs(),
-                        });
+                            events.push(ContractEvent {
+                                contract_address: contract_address.to_string(),
+                                event_type: "CircuitObfuscated".to_string(),
+                                topics: vec![caller.to_string()],
+                                data: Vec::new(),
+                                timestamp: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs(),
+                            });
 
-                        return_data = vec![1]; // Success
-                        Ok(())
+                            return_data = vec![1]; // Success
+                            Ok(())
+                        }
+                        Err(e) => {
+                            success = false;
+                            error_message = Some(e.to_string());
+                            Err(e)
+                        }
                     }
-                    Err(e) => {
-                        success = false;
-                        error_message = Some(e.to_string());
-                        Err(e)
-                    }
+                } else {
+                    success = false;
+                    error_message = Some("PolyCircuit not found for contract".to_string());
+                    Err(anyhow::anyhow!("PolyCircuit not found"))
                 }
             }
             "get_info" => {
                 // Return circuit information
-                let info = CircuitInfo {
-                    id: circuit.id.clone(),
-                    description: circuit.description.clone(),
-                    input_size: circuit.input_size,
-                    output_size: circuit.output_size,
-                };
-
-                return_data = bincode::serialize(&info)?;
+                return_data = bincode::serialize(&circuit)?;
                 Ok(())
             }
             "encrypt_data" => {
@@ -303,45 +307,23 @@ impl PrivacyContractEngine {
     }
 
     /// Load circuit from storage
-    #[allow(dead_code)]
     fn load_circuit(&mut self, contract_address: &str) -> Result<Option<PrivacyCircuit>> {
-        // Check memory cache first
-        if let Some(circuit) = self.active_circuits.get(contract_address) {
-            return Ok(Some(circuit.clone()));
-        }
-
-        // Load from storage
+        // Load circuit metadata from storage
         if let Some(circuit_data) = self
             .storage
             .get_contract_state(contract_address, "circuit_info")?
         {
-            let info: CircuitInfo = bincode::deserialize(&circuit_data)?;
-
-            let circuit = PrivacyCircuit {
-                id: info.id,
-                description: info.description,
-                input_size: info.input_size,
-                output_size: info.output_size,
-            };
-
-            // Cache in memory
-            self.active_circuits
-                .insert(contract_address.to_string(), circuit.clone());
-
-            Ok(Some(circuit))
-        } else {
-            Ok(None)
+            let circuit: PrivacyCircuit = bincode::deserialize(&circuit_data)?;
+            return Ok(Some(circuit));
         }
-    }
-}
 
-/// Serializable circuit information
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
-struct CircuitInfo {
-    id: String,
-    description: String,
-    input_size: usize,
-    output_size: usize,
+        Ok(None)
+    }
+
+    /// Get the actual PolyCircuit for a contract
+    fn get_poly_circuit(&self, contract_address: &str) -> Option<&PolyCircuit> {
+        self.active_circuits.get(contract_address)
+    }
 }
 
 impl UnifiedContractEngine for PrivacyContractEngine {
@@ -483,12 +465,12 @@ impl UnifiedContractEngine for PrivacyContractEngine {
 mod tests {
     use super::*;
     use crate::smart_contract::{
+        unified_contract_storage::SyncInMemoryContractStorage,
         unified_engine::{UnifiedGasConfig, UnifiedGasManager},
-        unified_storage::SyncInMemoryContractStorage,
     };
 
     fn create_test_engine() -> PrivacyContractEngine {
-        let storage = Arc::new(SyncInMemoryContractStorage::new());
+        let storage = Arc::new(SyncInMemoryContractStorage::new_sync_memory());
         let gas_manager = UnifiedGasManager::new(UnifiedGasConfig::default());
         let privacy_config = PrivacyEngineConfig::dummy(); // Use dummy mode for tests
         PrivacyContractEngine::new(storage, gas_manager, privacy_config).unwrap()

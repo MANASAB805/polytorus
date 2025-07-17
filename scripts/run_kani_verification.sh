@@ -49,10 +49,10 @@ run_verification() {
     local harness_name=$1
     local description=$2
     local timeout=${3:-300} # Default 5 minutes timeout
-    
+
     print_status "Running verification: $description"
     echo "Harness: $harness_name"
-    
+
     if timeout $timeout cargo kani --harness $harness_name > "verification_results/${harness_name}.log" 2>&1; then
         print_success "✅ $description - PASSED"
         return 0

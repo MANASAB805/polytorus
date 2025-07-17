@@ -7,7 +7,7 @@ Welcome to PolyTorus Local Testnet! This guide helps you set up and run a comple
 Before you begin, ensure you have the following installed:
 
 - **Docker** - Container runtime
-- **ContainerLab** - Network topology orchestrator  
+- **ContainerLab** - Network topology orchestrator
 - **Python 3** - For CLI tools
 - **curl** - For API testing
 
@@ -190,7 +190,7 @@ curl -X POST http://localhost:9020/transaction/send \
   -H "Content-Type: application/json" \
   -d '{
     "from": "sender_address",
-    "to": "recipient_address", 
+    "to": "recipient_address",
     "amount": 10.5,
     "gasPrice": 1
   }'
@@ -430,7 +430,7 @@ This testnet setup is part of the PolyTorus project and follows the same license
 Now that your testnet is running:
 
 1. **Explore the Web UI**: Familiarize yourself with the interface
-2. **Try API Calls**: Test the REST API endpoints  
+2. **Try API Calls**: Test the REST API endpoints
 3. **Create a dApp**: Build your first decentralized application
 4. **Run Load Tests**: Test performance with multiple transactions
 5. **Experiment with Configuration**: Modify settings and observe changes

@@ -7,7 +7,7 @@ Supports **complete transaction propagation** with accurate tracking of both sen
 
 ### Overview
 - **Sender API**: `/send` endpoint increments `tx_count` on sender nodes
-- **Receiver API**: `/transaction` endpoint increments `rx_count` on receiver nodes  
+- **Receiver API**: `/transaction` endpoint increments `rx_count` on receiver nodes
 - **Complete Tracking**: Each transaction is properly recorded on both sender and receiver sides
 
 ### Propagation Flow
@@ -61,7 +61,7 @@ curl -X POST -H "Content-Type: application/json" \
   -d '{"from":"wallet_node-0","to":"wallet_node-1","amount":100,"nonce":1001}' \
   "http://127.0.0.1:9000/send"
 
-# Step 2: Record receive at receiver node  
+# Step 2: Record receive at receiver node
 echo "Step 2: Recording receive at Node 1..."
 curl -X POST -H "Content-Type: application/json" \
   -d '{"from":"wallet_node-0","to":"wallet_node-1","amount":100,"nonce":1001}' \
@@ -84,7 +84,7 @@ while true; do
   clear
   echo "=== Node Statistics $(date) ==="
   for port in 9000 9001 9002 9003; do
-    echo "Node port $port:" 
+    echo "Node port $port:"
     curl -s "http://127.0.0.1:$port/stats" | jq '{transactions_sent, transactions_received, node_id}'
     echo ""
   done
@@ -169,7 +169,7 @@ curl http://127.0.0.1:9001/stats  # Receiver statistics
 **Receive Recording API (`/transaction`) Response:**
 ```json
 {
-  "status": "accepted", 
+  "status": "accepted",
   "transaction_id": "baf3ecb7-86dd-4523-9d8a-0eb90eb6da43",
   "message": "Transaction from wallet_node-0 to wallet_node-1 for 100 accepted"
 }
@@ -269,7 +269,7 @@ output = "console"
 - **TX Sent**: Number of sent transactions (**✅ Implemented**)
 - **TX Recv**: Number of received transactions (**✅ Implemented**)
 - **Network Latency**: Inter-node communication latency
-- **Block Propagation**: Block propagation time  
+- **Block Propagation**: Block propagation time
 - **API Response Time**: HTTP API response time
 
 ## 🔄 Available Scripts
@@ -307,7 +307,7 @@ done
    ```bash
    # Check ports in use
    netstat -tulpn | grep :9000
-   
+
    # Use different base port
    ./scripts/simulate.sh local --base-port 9100
    ```
@@ -330,10 +330,10 @@ done
    ```bash
    # Health check
    curl http://127.0.0.1:9000/health
-   
+
    # Process check
    ./scripts/simulate.sh status
-   
+
    # Restart
    ./scripts/simulate.sh stop && ./scripts/simulate.sh local
    ```
@@ -385,10 +385,10 @@ data/simulation/
    ```bash
    # Before sending
    curl -s http://127.0.0.1:9000/stats | jq '.transactions_sent'  # 0
-   
+
    # Execute send
    curl -X POST http://127.0.0.1:9000/send -d '{...}'
-   
+
    # After sending
    curl -s http://127.0.0.1:9000/stats | jq '.transactions_sent'  # 1
    ```
@@ -397,10 +397,10 @@ data/simulation/
    ```bash
    # Before receiving
    curl -s http://127.0.0.1:9001/stats | jq '.transactions_received'
-   
+
    # Execute receive
    curl -X POST http://127.0.0.1:9001/transaction -d '{...}'
-   
+
    # After receiving
    curl -s http://127.0.0.1:9001/stats | jq '.transactions_received'  # +1
    ```

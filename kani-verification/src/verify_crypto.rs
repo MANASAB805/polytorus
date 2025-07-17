@@ -18,7 +18,12 @@ impl TXInput {
         assert!(vout >= 0, "vout must be non-negative");
         assert!(!signature.is_empty(), "signature cannot be empty");
         assert!(!pub_key.is_empty(), "pub_key cannot be empty");
-        TXInput { txid, vout, signature, pub_key }
+        TXInput {
+            txid,
+            vout,
+            signature,
+            pub_key,
+        }
     }
 }
 
@@ -34,7 +39,10 @@ impl TXOutput {
     pub fn new(value: i32, pub_key_hash: Vec<u8>) -> Self {
         assert!(value >= 0, "value must be non-negative");
         assert!(!pub_key_hash.is_empty(), "pub_key_hash cannot be empty");
-        TXOutput { value, pub_key_hash }
+        TXOutput {
+            value,
+            pub_key_hash,
+        }
     }
 }
 
@@ -100,7 +108,7 @@ fn verify_encryption_type_determination() {
     // Properties - avoid any equality comparison that might trigger memcmp
     let is_ecdsa = matches!(enc_type, EncryptionType::ECDSA);
     let is_fndsa = matches!(enc_type, EncryptionType::FNDSA);
-    
+
     if key_size <= 65 {
         assert!(is_ecdsa);
         assert!(!is_fndsa);
@@ -127,8 +135,8 @@ fn verify_transaction_integrity() {
 
     // Use fixed-size arrays to avoid dynamic Vec allocation and memcmp unwinding
     let signature_array = [1u8; 64]; // ECDSA signature size
-    let pubkey_array = [2u8; 33];    // Compressed public key
-    let hash_array = [3u8; 20];      // Hash160 size    // Avoid String operations that might trigger memcmp
+    let pubkey_array = [2u8; 33]; // Compressed public key
+    let hash_array = [3u8; 20]; // Hash160 size    // Avoid String operations that might trigger memcmp
     let tx_input = TXInput {
         txid: "test".to_string(), // Minimal string
         vout,
@@ -177,9 +185,9 @@ fn verify_transaction_value_bounds() {
 #[kani::proof]
 fn verify_signature_properties() {
     let signature_size: usize = kani::any();
-    kani::assume(signature_size > 0 && signature_size <= 64);    // Use fixed-size array instead of Vec to avoid dynamic allocation
+    kani::assume(signature_size > 0 && signature_size <= 64); // Use fixed-size array instead of Vec to avoid dynamic allocation
     let signature = [1u8; 64];
-    
+
     // Properties
     assert!(signature_size > 0);
     assert!(signature_size <= 64);
@@ -238,7 +246,7 @@ fn verify_simple_transaction_properties() {
     // Direct validation without complex structures
     assert!(vout >= 0);
     assert!(value >= 0);
-    
+
     // Basic arithmetic properties
     let sum = vout + value;
     assert!(sum >= 0);
@@ -251,11 +259,11 @@ fn verify_simple_transaction_properties() {
 #[kani::proof]
 fn verify_minimal_signature() {
     let sig_byte: u8 = kani::any();
-    
+
     // Simple signature property check
     let signature = [sig_byte; 64];
     assert_eq!(signature.len(), 64);
-    
+
     // Basic non-zero check for first and last byte
     if sig_byte != 0 {
         assert!(signature[0] != 0 || signature[63] == sig_byte);
@@ -268,10 +276,10 @@ fn verify_minimal_signature() {
 fn verify_ultra_minimal() {
     let x: u32 = kani::any();
     let y: u32 = kani::any();
-    
+
     kani::assume(x < 1000);
     kani::assume(y < 1000);
-    
+
     let sum = x + y;
     assert!(sum >= x);
     assert!(sum >= y);
@@ -283,11 +291,11 @@ fn verify_ultra_minimal() {
 fn verify_minimal_array() {
     let size: usize = kani::any();
     kani::assume(size > 0 && size <= 32);
-    
+
     let arr = [0u8; 32];
     assert!(arr.len() == 32);
     assert!(arr[0] == 0);
-    
+
     if size <= 32 {
         // Access within bounds
         let _val = arr[size - 1];
@@ -301,15 +309,15 @@ fn verify_minimal_array() {
 fn verify_minimal_encryption_type() {
     let key_size: usize = kani::any();
     kani::assume(key_size > 0 && key_size <= 100);
-    
+
     // Direct boolean logic instead of enum comparison
     let is_small_key = key_size <= 65;
     let is_large_key = key_size > 65;
-    
+
     // Basic logical properties
     assert!(is_small_key || is_large_key);
     assert!(!(is_small_key && is_large_key));
-    
+
     if key_size <= 65 {
         assert!(is_small_key);
     } else {

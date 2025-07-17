@@ -12,13 +12,13 @@ fix_format_strings() {
     local file="$1"
     if [ -f "$file" ]; then
         echo "  📝 Fixing format strings in $file"
-        
+
         # Fix println! format strings - common patterns
         sed -i 's/println!("\([^"]*\){}", \([^)]*\))/println!("\1{\2}")/g' "$file"
         sed -i 's/println!("\([^"]*\){:?}", \([^)]*\))/println!("\1{\2:?}")/g' "$file"
         sed -i 's/format!("\([^"]*\){}", \([^)]*\))/format!("\1{\2}")/g' "$file"
         sed -i 's/format!("\([^"]*\){:?}", \([^)]*\))/format!("\1{\2:?}")/g' "$file"
-        
+
         # More complex replacements for multiple variables
         # This is a simplified approach - manual fixes might be needed for complex cases
     fi
@@ -29,13 +29,13 @@ fix_common_issues() {
     local file="$1"
     if [ -f "$file" ]; then
         echo "  🔧 Fixing common issues in $file"
-        
+
         # Remove redundant tokio imports
         sed -i '/^use tokio;$/d' "$file"
-        
+
         # Fix vec! to array where appropriate (simple cases)
         sed -i 's/vec!\[\([^]]*\)\]/[\1]/g' "$file"
-        
+
         # Fix let unit values (simple pattern)
         sed -i 's/let _result = \([^;]*\);/\1;/g' "$file"
     fi
