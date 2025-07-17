@@ -60,19 +60,19 @@ print_usage() {
 
 check_dependencies() {
     local missing_deps=()
-    
+
     if ! command -v containerlab &> /dev/null; then
         missing_deps+=("containerlab")
     fi
-    
+
     if ! command -v docker &> /dev/null; then
         missing_deps+=("docker")
     fi
-    
+
     if ! command -v python3 &> /dev/null; then
         missing_deps+=("python3")
     fi
-    
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         echo -e "${RED}❌ Missing dependencies:${NC}"
         for dep in "${missing_deps[@]}"; do
@@ -88,7 +88,7 @@ check_dependencies() {
 
 build_image() {
     echo -e "${BLUE}🔨 Building PolyTorus testnet Docker image...${NC}"
-    
+
     if docker build -f Dockerfile.testnet -t "$DOCKER_IMAGE" .; then
         echo -e "${GREEN}✅ Docker image built successfully${NC}"
     else
@@ -99,35 +99,35 @@ build_image() {
 
 prepare_environment() {
     echo -e "${BLUE}📁 Preparing testnet environment...${NC}"
-    
+
     # Create data directories
     mkdir -p testnet-data/{bootstrap,miner-1,miner-2,validator,api-gateway}
-    
+
     # Create logs directories
     for node in bootstrap miner-1 miner-2 validator api-gateway; do
         mkdir -p "testnet-data/$node/logs"
     done
-    
+
     # Ensure configuration file exists
     if [[ ! -f "config/testnet.toml" ]]; then
         echo -e "${YELLOW}⚠️  Configuration file not found, using default${NC}"
     fi
-    
+
     echo -e "${GREEN}✅ Environment prepared${NC}"
 }
 
 start_testnet() {
     echo -e "${BLUE}🚀 Starting PolyTorus local testnet...${NC}"
-    
+
     check_dependencies
     prepare_environment
-    
+
     # Check if image exists
     if ! docker image inspect "$DOCKER_IMAGE" > /dev/null 2>&1; then
         echo -e "${YELLOW}⚠️  Docker image not found, building...${NC}"
         build_image
     fi
-    
+
     # Deploy ContainerLab topology
     if containerlab deploy --topo "$TOPOLOGY_FILE"; then
         echo -e "${GREEN}✅ Testnet started successfully!${NC}"
@@ -149,17 +149,17 @@ start_testnet() {
 
 stop_testnet() {
     echo -e "${BLUE}🛑 Stopping PolyTorus local testnet...${NC}"
-    
+
     if containerlab destroy --topo "$TOPOLOGY_FILE"; then
         echo -e "${GREEN}✅ Testnet stopped successfully${NC}"
     else
         echo -e "${YELLOW}⚠️  Some containers may still be running${NC}"
-        
+
         # Force stop containers
         echo -e "${BLUE}🔧 Force stopping containers...${NC}"
         docker ps --filter "label=containerlab" --filter "name=clab-$TESTNET_NAME" -q | xargs -r docker stop
         docker ps -a --filter "label=containerlab" --filter "name=clab-$TESTNET_NAME" -q | xargs -r docker rm
-        
+
         echo -e "${GREEN}✅ Containers force stopped${NC}"
     fi
 }
@@ -174,25 +174,25 @@ restart_testnet() {
 show_status() {
     echo -e "${BLUE}📊 PolyTorus Local Testnet Status${NC}"
     echo -e "=================================="
-    
+
     # Check ContainerLab topology
     if containerlab inspect --topo "$TOPOLOGY_FILE" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ ContainerLab topology is running${NC}"
-        
+
         echo -e "\n${CYAN}📡 Node Status:${NC}"
-        
+
         # Check individual nodes
         local nodes=(
             "bootstrap:9000"
-            "miner-1:9001"  
+            "miner-1:9001"
             "miner-2:9002"
             "validator:9003"
             "api-gateway:9020"
         )
-        
+
         for node_info in "${nodes[@]}"; do
             IFS=':' read -r name port <<< "$node_info"
-            
+
             if curl -s --connect-timeout 3 "http://localhost:$port/health" > /dev/null 2>&1 || \
                curl -s --connect-timeout 3 "http://localhost:$port/" > /dev/null 2>&1; then
                 echo -e "   ✅ $name (port $port): Online"
@@ -200,7 +200,7 @@ show_status() {
                 echo -e "   ❌ $name (port $port): Offline"
             fi
         done
-        
+
         # Show container status
         echo -e "\n${CYAN}🐳 Container Status:${NC}"
         docker ps --filter "label=containerlab" --filter "name=clab-$TESTNET_NAME" \
@@ -208,7 +208,7 @@ show_status() {
             while read -r line; do
                 echo -e "   📦 $line"
             done
-        
+
     else
         echo -e "${RED}❌ Testnet is not running${NC}"
         echo -e "${YELLOW}💡 Start it with: $0 start${NC}"
@@ -218,20 +218,20 @@ show_status() {
 show_logs() {
     echo -e "${BLUE}📋 Container Logs${NC}"
     echo -e "=================="
-    
+
     local containers=$(docker ps --filter "label=containerlab" --filter "name=clab-$TESTNET_NAME" --format "{{.Names}}")
-    
+
     if [[ -z "$containers" ]]; then
         echo -e "${YELLOW}⚠️  No running containers found${NC}"
         return
     fi
-    
+
     echo -e "${CYAN}Available containers:${NC}"
     echo "$containers" | nl -v1 -w2 -s'. '
-    
+
     echo -e "\n${YELLOW}Enter container number to view logs (or 'all' for all):${NC}"
     read -r choice
-    
+
     if [[ "$choice" == "all" ]]; then
         echo "$containers" | while read -r container; do
             echo -e "\n${CYAN}--- Logs for $container ---${NC}"
@@ -252,10 +252,10 @@ show_logs() {
 
 clean_testnet() {
     echo -e "${BLUE}🧹 Cleaning up testnet data...${NC}"
-    
+
     # Stop testnet first
     stop_testnet
-    
+
     # Remove data directories
     if [[ -d "testnet-data" ]]; then
         echo -e "${YELLOW}⚠️  This will delete all testnet data. Continue? (y/N)${NC}"
@@ -267,7 +267,7 @@ clean_testnet() {
             echo -e "${YELLOW}❌ Cleanup cancelled${NC}"
         fi
     fi
-    
+
     # Remove Docker image
     echo -e "${YELLOW}Remove Docker image as well? (y/N)${NC}"
     read -r confirm
@@ -279,7 +279,7 @@ clean_testnet() {
 
 create_wallet() {
     echo -e "${BLUE}👛 Creating new wallet...${NC}"
-    
+
     if python3 scripts/testnet_manager.py --create-wallet; then
         echo -e "${GREEN}✅ Wallet created successfully${NC}"
     else
@@ -290,7 +290,7 @@ create_wallet() {
 
 send_test_transaction() {
     echo -e "${BLUE}💸 Sending test transaction...${NC}"
-    
+
     if python3 scripts/testnet_manager.py --test-transactions 1; then
         echo -e "${GREEN}✅ Test transaction sent${NC}"
     else
@@ -301,34 +301,34 @@ send_test_transaction() {
 
 test_api_endpoints() {
     echo -e "${BLUE}🔧 Testing API endpoints...${NC}"
-    
+
     local api_url="http://localhost:9020"
-    
+
     # Check if API gateway is running
     if curl -s --connect-timeout 3 "$api_url/health" > /dev/null 2>&1; then
         echo -e "${GREEN}✅ API Gateway is running${NC}"
         echo -e "${CYAN}🔗 Base URL: $api_url${NC}"
         echo ""
-        
+
         echo -e "${YELLOW}Testing endpoints:${NC}"
-        
+
         # Test network status
         echo -e "  📊 Network status:"
         curl -s "$api_url/network/status" | head -c 100
         echo "..."
-        
+
         # Test wallet list
         echo -e "\n  👛 Wallet list:"
         curl -s "$api_url/wallet/list" | head -c 100
         echo "..."
-        
+
         echo -e "\n\n${CYAN}Available endpoints:${NC}"
         echo -e "  GET  $api_url/network/status"
         echo -e "  GET  $api_url/wallet/list"
         echo -e "  POST $api_url/wallet/create"
         echo -e "  GET  $api_url/balance/<address>"
         echo -e "  POST $api_url/transaction/send"
-        
+
     else
         echo -e "${RED}❌ API Gateway is not running${NC}"
         echo -e "${YELLOW}💡 Start the testnet first: $0 start${NC}"
@@ -337,7 +337,7 @@ test_api_endpoints() {
 
 start_cli() {
     echo -e "${BLUE}🎮 Starting interactive CLI...${NC}"
-    
+
     if [[ -f "scripts/testnet_manager.py" ]]; then
         python3 scripts/testnet_manager.py --interactive
     else

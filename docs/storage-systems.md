@@ -15,15 +15,15 @@ pub trait ContractStateStorage {
     // Contract metadata management
     fn store_contract_metadata(&self, metadata: &UnifiedContractMetadata) -> Result<()>;
     fn get_contract_metadata(&self, address: &str) -> Result<Option<UnifiedContractMetadata>>;
-    
+
     // Contract state management
     fn set_contract_state(&self, contract: &str, key: &str, value: &[u8]) -> Result<()>;
     fn get_contract_state(&self, contract: &str, key: &str) -> Result<Option<Vec<u8>>>;
     fn delete_contract_state(&self, contract: &str, key: &str) -> Result<()>;
-    
+
     // Contract discovery
     fn list_contracts(&self) -> Result<Vec<String>>;
-    
+
     // Execution history
     fn store_execution(&self, execution: &ContractExecutionRecord) -> Result<()>;
     fn get_execution_history(&self, contract: &str) -> Result<Vec<ContractExecutionRecord>>;
@@ -290,8 +290,8 @@ if let Some(db_storage) = storage.as_any().downcast_ref::<DatabaseContractStorag
     let connection_stats = db_storage.get_stats().await;
     println!("- PostgreSQL connections: {}", connection_stats.postgres_connections);
     println!("- Redis connections: {}", connection_stats.redis_connections);
-    println!("- Cache hit rate: {:.2}%", 
-        connection_stats.cache_hits as f64 / 
+    println!("- Cache hit rate: {:.2}%",
+        connection_stats.cache_hits as f64 /
         (connection_stats.cache_hits + connection_stats.cache_misses) as f64 * 100.0
     );
 }
@@ -345,10 +345,10 @@ for contract_address in contracts {
     if let Some(metadata) = in_memory.get_contract_metadata(&contract_address)? {
         sled_storage.store_contract_metadata(&metadata)?;
     }
-    
+
     // Migrate state (implementation depends on state structure)
     // This would require iterating through all state keys
-    
+
     // Migrate execution history
     let history = in_memory.get_execution_history(&contract_address)?;
     for execution in history {

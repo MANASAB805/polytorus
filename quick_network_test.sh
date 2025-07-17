@@ -113,23 +113,23 @@ sleep 3
 if kill -0 $ERROR_NODE_PID 2>/dev/null; then
     # Test invalid JSON
     echo -e "${CYAN}Testing invalid requests:${NC}"
-    
+
     # Invalid JSON
     RESPONSE=$(timeout 2 curl -s -X POST -H "Content-Type: application/json" \
         -d '{"invalid":"json",}' \
         "http://127.0.0.1:9501/send" 2>/dev/null || echo "Failed")
     echo -e "${GREEN}  ✅ Invalid JSON handled${NC}"
-    
+
     # Missing fields
     RESPONSE=$(timeout 2 curl -s -X POST -H "Content-Type: application/json" \
         -d '{"from":"wallet1"}' \
         "http://127.0.0.1:9501/send" 2>/dev/null || echo "Failed")
     echo -e "${GREEN}  ✅ Missing fields handled${NC}"
-    
+
     # Non-existent endpoint
     RESPONSE=$(timeout 2 curl -s "http://127.0.0.1:9501/nonexistent" 2>/dev/null || echo "Failed")
     echo -e "${GREEN}  ✅ Invalid endpoint handled${NC}"
-    
+
     kill $ERROR_NODE_PID 2>/dev/null
 else
     echo -e "${RED}❌ Error test node failed to start${NC}"
@@ -140,7 +140,7 @@ echo -e "\n${CYAN}📊 Quick Log Analysis${NC}"
 for log in logs/quick-*.log; do
     if [ -f "$log" ]; then
         echo -e "${CYAN}$log:${NC}"
-        
+
         # Count errors
         ERROR_COUNT=$(grep -i "error\|fail\|panic" "$log" 2>/dev/null | wc -l)
         if [ $ERROR_COUNT -gt 0 ]; then
@@ -149,7 +149,7 @@ for log in logs/quick-*.log; do
         else
             echo -e "${GREEN}  ✅ No errors${NC}"
         fi
-        
+
         # Check for network activity
         NETWORK_COUNT=$(grep -i "network\|connect\|peer" "$log" 2>/dev/null | wc -l)
         echo -e "  📡 Network events: $NETWORK_COUNT"

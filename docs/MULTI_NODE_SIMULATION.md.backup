@@ -46,7 +46,7 @@ curl http://127.0.0.1:9001/stats  # 受信者の統計
 **受信記録API (`/transaction`) のレスポンス:**
 ```json
 {
-  "status": "accepted", 
+  "status": "accepted",
   "transaction_id": "baf3ecb7-86dd-4523-9d8a-0eb90eb6da43",
   "message": "Transaction from wallet_node-0 to wallet_node-1 for 100 accepted"
 }
@@ -67,7 +67,7 @@ curl http://127.0.0.1:9001/stats  # 受信者の統計
 
 ### 概要
 - **送信側API**: `/send`エンドポイントで送信者ノードの`tx_count`をインクリメント
-- **受信側API**: `/transaction`エンドポイントで受信者ノードの`rx_count`をインクリメント  
+- **受信側API**: `/transaction`エンドポイントで受信者ノードの`rx_count`をインクリメント
 - **完全な追跡**: 各トランザクションが送信側と受信側の両方で正しく記録される
 
 ### 伝播フロー
@@ -104,7 +104,7 @@ curl -X POST -H "Content-Type: application/json" \
   -d '{"from":"wallet_node-0","to":"wallet_node-1","amount":100,"nonce":1001}' \
   "http://127.0.0.1:9000/send"
 
-# Step 2: 受信者ノードに受信を記録  
+# Step 2: 受信者ノードに受信を記録
 curl -X POST -H "Content-Type: application/json" \
   -d '{"from":"wallet_node-0","to":"wallet_node-1","amount":100,"nonce":1001}' \
   "http://127.0.0.1:9001/transaction"
@@ -205,7 +205,7 @@ grep "Transaction" ./data/simulation/node-*.log | wc -l
    ```bash
    # 使用中のポートを確認
    netstat -tulpn | grep :9000
-   
+
    # 別のベースポートを使用
    ./scripts/simulate.sh local --base-port 9100
    ```
@@ -214,7 +214,7 @@ grep "Transaction" ./data/simulation/node-*.log | wc -l
    ```bash
    # ログを確認
    ./scripts/simulate.sh logs
-   
+
    # データディレクトリをクリーン
    ./scripts/simulate.sh clean
    ```
@@ -223,7 +223,7 @@ grep "Transaction" ./data/simulation/node-*.log | wc -l
    ```bash
    # ノード状態を確認
    ./scripts/simulate.sh status
-   
+
    # APIエンドポイントを確認
    curl http://127.0.0.1:9000/status
    ```

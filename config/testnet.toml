@@ -11,7 +11,7 @@ peer_timeout = 120
 enable_discovery = true
 discovery_interval = 60
 max_message_size = 1048576  # 1MB
-bandwidth_limit = null
+# bandwidth_limit = null
 
 [execution]
 gas_limit = 8000000

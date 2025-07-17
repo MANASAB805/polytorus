@@ -1,9 +1,10 @@
 //! Advanced smart contract integration tests
 
+use tempfile::TempDir;
+
 use crate::smart_contract::{
     contract::SmartContract, engine::ContractEngine, state::ContractState, types::ContractExecution,
 };
-use tempfile::TempDir;
 
 #[cfg(test)]
 pub mod advanced_contract_tests {

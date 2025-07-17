@@ -47,8 +47,8 @@ services:
     command: >
       sh -c "
         sleep 10 &&
-        polytorus --modular-start 
-        --config /app/config/ec2-testnet.toml 
+        polytorus --modular-start
+        --config /app/config/ec2-testnet.toml
         --http-port 8080
         --data-dir /app/data
       "
@@ -78,8 +78,8 @@ services:
     command: >
       sh -c "
         sleep 15 &&
-        polytorus --modular-start 
-        --config /app/config/ec2-testnet.toml 
+        polytorus --modular-start
+        --config /app/config/ec2-testnet.toml
         --http-port 8080
         --data-dir /app/data
       "

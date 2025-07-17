@@ -60,7 +60,7 @@ curl -fsSL https://get.docker.com | sh               # Docker
 ```bash
 # Management
 ./start-local-testnet.sh start     # Start testnet
-./start-local-testnet.sh stop      # Stop testnet  
+./start-local-testnet.sh stop      # Stop testnet
 ./start-local-testnet.sh status    # Check status
 ./start-local-testnet.sh logs      # View logs
 

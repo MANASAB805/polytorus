@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 use crate::{
-    diamond_io_integration_new::{PrivacyEngineConfig, PrivacyEngineIntegration},
+    diamond_io_integration_unified::{PrivacyEngineConfig, PrivacyEngineIntegration},
     modular::{
         message_bus::MessageBus,
         traits::{Layer, LayerMessage},

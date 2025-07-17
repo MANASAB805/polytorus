@@ -14,7 +14,7 @@ solver-args = ["--unwind", "20", "--bounds-check", "--pointer-check", "--no-unwi
 description = "Formal verification of cryptographic operations"
 harnesses = [
     "verify_ecdsa_sign_verify",
-    "verify_fndsa_sign_verify", 
+    "verify_fndsa_sign_verify",
     "verify_transaction_integrity",
     "verify_merkle_tree_properties"
 ]

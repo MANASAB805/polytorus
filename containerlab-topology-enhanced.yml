@@ -15,13 +15,13 @@ topology:
     env:
       POLYTORUS_LOG_LEVEL: INFO
       POLYTORUS_DATA_DIR: /data
-      
+
   nodes:
     # =======================================================================
     # AUTONOMOUS SYSTEM 65001 - NORTH AMERICA
     # Bootstrap nodes, mining pools, exchange infrastructure
     # =======================================================================
-    
+
     # Core Internet Router - North America
     router-na:
       kind: linux
@@ -65,7 +65,7 @@ topology:
         mkdir -p /data &&
         polytorus --config /config/realistic-testnet.toml modular start
 
-    # Mining Pool - North America  
+    # Mining Pool - North America
     miner-pool-na:
       kind: linux
       image: polytorus:latest
@@ -409,7 +409,7 @@ topology:
 
     # AS65001 - North America Internal
     - endpoints: ["router-na:eth1", "bootstrap-na:eth1"]
-    - endpoints: ["router-na:eth1", "miner-pool-na:eth1"] 
+    - endpoints: ["router-na:eth1", "miner-pool-na:eth1"]
     - endpoints: ["router-na:eth1", "exchange-na:eth1"]
 
     # AS65002 - Europe Internal
@@ -424,29 +424,28 @@ topology:
     - endpoints: ["router-edge:eth1", "light-client-mobile:eth1"]
     - endpoints: ["router-edge:eth1", "rural-satellite:eth1"]
 
-# =======================================================================
-# LABELS AND METADATA
-# =======================================================================
-topology:
+  # =======================================================================
+  # LABELS AND METADATA
+  # =======================================================================
   labels:
     # Network simulation metadata
     simulation.type: "realistic-testnet"
     simulation.version: "1.0"
     blockchain.platform: "polytorus"
     network.topology: "multi-as-geographic"
-    
+
     # Autonomous System labels
     as.65001: "north-america"
-    as.65002: "europe" 
+    as.65002: "europe"
     as.65003: "asia-pacific"
     as.65004: "edge-mobile"
-    
+
     # Geographic regions
     region.na: "North America - Low latency cluster"
     region.eu: "Europe - Institutional/Compliance focus"
     region.apac: "Asia Pacific - Mobile/IoT infrastructure"
     region.edge: "Edge/Mobile - Constrained connectivity"
-    
+
     # Network characteristics
     latency.intra-region: "10-50ms"
     latency.inter-region: "100-600ms"

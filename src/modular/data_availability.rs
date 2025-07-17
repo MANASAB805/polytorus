@@ -19,7 +19,7 @@ use crate::Result;
 ///
 /// * **Merkle Tree Proofs**: Real cryptographic proof generation and verification
 /// * **Data Integrity**: Comprehensive checksums and validation
-/// * **Network Distribution**: P2P data replication and availability tracking  
+/// * **Network Distribution**: P2P data replication and availability tracking
 /// * **Verification Caching**: Optimized verification with intelligent caching
 /// * **Retention Policies**: Configurable data lifecycle management
 ///

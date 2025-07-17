@@ -4,7 +4,6 @@ use actix_web::{post, web, HttpResponse, Responder};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-#[allow(dead_code)]
 struct StartMinerRequest {
     host: String,
     port: String,
@@ -13,7 +12,16 @@ struct StartMinerRequest {
 }
 
 #[post("/start-miner")]
-pub async fn start_miner(_req: web::Json<StartMinerRequest>) -> impl Responder {
+pub async fn start_miner(req: web::Json<StartMinerRequest>) -> impl Responder {
+    // Log the request details even though we don't implement it
+    eprintln!(
+        "Legacy miner request received for {}:{} with mining address: {}",
+        req.host, req.port, req.mining_address
+    );
+    if let Some(ref bootstrap) = req.bootstrap {
+        eprintln!("Bootstrap node specified: {}", bootstrap);
+    }
+
     HttpResponse::NotImplemented()
         .body("Legacy miner has been removed. Use 'polytorus modular mine' commands instead.")
 }

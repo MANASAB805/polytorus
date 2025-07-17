@@ -66,7 +66,7 @@ cargo run --example multi_node_simulation
 ./target/release/polytorus --modular-start --http-port 9000
 ```
 
-### ✅ **Type 2: Consortium Testnet** 
+### ✅ **Type 2: Consortium Testnet**
 - **Target**: Known participants
 - **Node Count**: 4-50
 - **Setup Time**: Immediate
@@ -79,7 +79,7 @@ cargo run --example multi_node_simulation
 
 ### ⚠️ **Type 3: Semi-Public Testnet**
 - **Target**: External developers
-- **Node Count**: 50-100  
+- **Node Count**: 50-100
 - **Setup Time**: 1-2 weeks
 - **Required Additional Implementation**: TLS/SSL, authentication system
 
@@ -130,7 +130,7 @@ cargo run --example multi_node_simulation
 
 ### **Immediate (0 days)**
 - [x] Private development network
-- [x] Local multi-node testing  
+- [x] Local multi-node testing
 - [x] Docker-based simulation
 
 ### **Within 1 Week**
@@ -159,7 +159,7 @@ cargo run --example multi_node_simulation
 **Goal**: Internal team feature validation, bug fixes, performance testing
 
 ### **Phase 2: 2 weeks later**
-```bash  
+```bash
 # After security hardening
 ./scripts/deploy_testnet_secure.sh 10
 ```

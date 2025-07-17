@@ -26,7 +26,7 @@ sleep 5
 
 echo "🔍 Checking network status..."
 echo "Node 1 PID: $NODE1_PID"
-echo "Node 2 PID: $NODE2_PID" 
+echo "Node 2 PID: $NODE2_PID"
 echo "Node 3 PID: $NODE3_PID"
 
 # Test network connectivity

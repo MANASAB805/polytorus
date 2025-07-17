@@ -40,20 +40,20 @@ echo "⚙️  Test 4: Configuration File Validation"
 for config in config/modular-node1.toml config/modular-node2.toml config/modular-node3.toml; do
     if [ -f "$config" ]; then
         echo "✅ Configuration file exists: $config"
-        
+
         # Check for required sections
         if grep -q "\[network\]" "$config"; then
             echo "  ✅ Network section found"
         else
             echo "  ❌ Network section missing"
         fi
-        
+
         if grep -q "listen_addr" "$config"; then
             echo "  ✅ Listen address configured"
         else
             echo "  ❌ Listen address missing"
         fi
-        
+
         if grep -q "bootstrap_peers" "$config"; then
             echo "  ✅ Bootstrap peers configured"
         else
@@ -101,7 +101,7 @@ echo ""
 echo "🔧 Test 7: Binary Validation"
 if [ -f "target/release/polytorus" ]; then
     echo "✅ PolyTorus binary exists"
-    
+
     # Test help command (should not require network)
     if timeout 5 ./target/release/polytorus --help > /dev/null 2>&1; then
         echo "✅ Binary help command works"

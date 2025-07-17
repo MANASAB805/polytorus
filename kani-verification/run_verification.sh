@@ -58,13 +58,13 @@ run_verification() {
     local harness_name=$1
     local description=$2
     local timeout_sec=${3:-60}
-    
+
     echo -e "${BLUE}🔍 Executing: ${description}${NC}"
     echo "   Harness: ${harness_name}"
     echo "   Timeout: ${timeout_sec} seconds"
-    
+
     ((TOTAL++))
-    
+
     if timeout ${timeout_sec} cargo kani --harness ${harness_name} > "$RESULTS_DIR/${harness_name}.log" 2>&1; then
         if grep -q "VERIFICATION:- SUCCESSFUL" "$RESULTS_DIR/${harness_name}.log"; then
             echo -e "${GREEN}✅ ${description} - Success${NC}"
@@ -135,25 +135,25 @@ for log_file in "$RESULTS_DIR"/*.log; do
     if [ -f "$log_file" ]; then
         harness_name=$(basename "$log_file" .log)
         echo "### $harness_name" >> "$RESULTS_DIR/summary.md"
-        
+
         if grep -q "VERIFICATION:- SUCCESSFUL" "$log_file"; then
             echo "**Status:** ✅ Success" >> "$RESULTS_DIR/summary.md"
         else
             echo "**Status:** ❌ Failed" >> "$RESULTS_DIR/summary.md"
         fi
-        
+
         # Extract execution time
         if grep -q "Verification Time:" "$log_file"; then
             exec_time=$(grep "Verification Time:" "$log_file" | tail -1)
             echo "**$exec_time**" >> "$RESULTS_DIR/summary.md"
         fi
-        
+
         # Extract check count
         if grep -q "SUMMARY:" "$log_file"; then
             check_summary=$(grep -A 1 "SUMMARY:" "$log_file" | tail -1)
             echo "**Result:** $check_summary" >> "$RESULTS_DIR/summary.md"
         fi
-        
+
         echo "" >> "$RESULTS_DIR/summary.md"
     fi
 done

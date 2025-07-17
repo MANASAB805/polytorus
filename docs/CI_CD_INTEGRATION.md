@@ -82,7 +82,7 @@ jobs:
 #### Quick Checks Job
 - **Purpose**: Provide fast feedback on basic quality issues
 - **Runtime**: ~2-3 minutes
-- **Checks**: 
+- **Checks**:
   - Code formatting (`cargo fmt --check`)
   - Linting (`cargo clippy`)
   - Security audit (`cargo audit`)

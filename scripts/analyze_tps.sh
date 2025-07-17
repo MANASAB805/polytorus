@@ -19,26 +19,26 @@ echo
 analyze_tps_results() {
     local benchmark_name=$1
     local description=$2
-    
+
     if [ -d "target/criterion/$benchmark_name" ]; then
         echo "=== $description ==="
-        
+
         # Find the latest results directory
         latest_dir=$(find target/criterion/$benchmark_name -name "report" -type d | head -1)
-        
+
         if [ -n "$latest_dir" ]; then
             echo "Results directory: $latest_dir"
-            
+
             # Look for JSON files with measurement data
             json_files=$(find target/criterion/$benchmark_name -name "*.json" 2>/dev/null)
-            
+
             if [ -n "$json_files" ]; then
                 echo "Raw measurement files found:"
                 echo "$json_files" | while read file; do
                     echo "  - $(basename $file)"
                 done
             fi
-            
+
             # Check for HTML report
             html_report="$latest_dir/index.html"
             if [ -f "$html_report" ]; then

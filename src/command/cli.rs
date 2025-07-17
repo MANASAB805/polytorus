@@ -1107,7 +1107,7 @@ impl ModernCli {
         let data_context = self.get_data_context();
         data_context.ensure_directories()?;
         let state = ContractState::new(&data_context.contracts_db_path)?;
-        let engine = ContractEngine::new(state)?;
+        let mut engine = ContractEngine::new(state)?;
 
         // Generate contract address
         let contract_address = format!("erc20_{}", symbol.to_lowercase());
@@ -1119,7 +1119,6 @@ impl ModernCli {
             decimals,
             initial_supply,
             owner.clone(),
-            contract_address.clone(),
         ) {
             Ok(_) => {
                 println!("✅ ERC20 contract deployed successfully!");

@@ -50,7 +50,7 @@ cargo run --example multi_node_simulation
 - Setup: Immediate
 
 **Consortium Testnet**
-- Target: Known participants  
+- Target: Known participants
 - Nodes: 4-50
 - Security: Internal testing
 - Setup: Immediate
@@ -104,7 +104,7 @@ curl http://localhost:9000/api/health
 # Network status
 curl http://localhost:9000/api/network/status
 
-# Real-time statistics  
+# Real-time statistics
 curl http://localhost:9000/api/stats
 ```
 
@@ -151,7 +151,7 @@ Unlike monolithic blockchains, PolyTorus implements true modularity:
 
 - **Consensus Layer**: PoW with pluggable interfaces for PoS
 - **Execution Layer**: Hybrid account/eUTXO with WASM contracts
-- **Settlement Layer**: Optimistic rollups with real fraud proofs  
+- **Settlement Layer**: Optimistic rollups with real fraud proofs
 - **Data Availability**: Merkle proofs with network distribution
 
 ### **World-First Privacy Integration**
@@ -214,7 +214,7 @@ kubectl apply -f k8s/
 
 **Cloud Providers**
 - AWS: ECS/EKS ready
-- GCP: GKE compatible  
+- GCP: GKE compatible
 - Azure: AKS supported
 
 ## 📚 **Documentation**
@@ -224,7 +224,7 @@ kubectl apply -f k8s/
 - [`docs/DEPLOYMENT_STATUS_EN.md`](docs/DEPLOYMENT_STATUS_EN.md) - Current capabilities
 - [`scripts/deploy_testnet_en.sh`](scripts/deploy_testnet_en.sh) - Automated deployment
 
-### **Japanese Documentation**  
+### **Japanese Documentation**
 - [`docs/TESTNET_DEPLOYMENT.md`](docs/TESTNET_DEPLOYMENT.md) - 完全な展開ガイド
 - [`docs/DEPLOYMENT_STATUS.md`](docs/DEPLOYMENT_STATUS.md) - 現在の機能
 - [`scripts/deploy_testnet.sh`](scripts/deploy_testnet.sh) - 自動展開スクリプト

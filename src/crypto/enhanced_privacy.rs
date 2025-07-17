@@ -16,9 +16,26 @@ use crate::{
         },
         transaction::Transaction,
     },
-    diamond_io_integration_new::PrivacyEngineResult,
+    diamond_io_integration_unified::PrivacyEngineResult,
     Result,
 };
+
+/// Diamond IO circuit complexity levels for privacy operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DiamondCircuitComplexity {
+    /// Simple circuits for basic privacy operations
+    Simple,
+    /// Medium complexity for standard confidential transactions
+    Medium,
+    /// High complexity for advanced privacy features
+    High,
+}
+
+impl Default for DiamondCircuitComplexity {
+    fn default() -> Self {
+        Self::Medium
+    }
+}
 
 /// Enhanced privacy configuration combining traditional privacy with real Diamond IO
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +48,8 @@ pub struct EnhancedPrivacyConfig {
     pub enable_real_diamond_io: bool,
     /// Use hybrid mode (traditional + Diamond IO)
     pub use_hybrid_mode: bool,
+    /// Circuit complexity level for Diamond IO
+    pub circuit_complexity: DiamondCircuitComplexity,
     /// Circuit cleanup interval in seconds
     pub cleanup_interval: u64,
 }
@@ -42,7 +61,8 @@ impl Default for EnhancedPrivacyConfig {
             diamond_io_config: RealDiamondIOConfig::testing(),
             enable_real_diamond_io: false, // Disabled: DiamondIO only for smart contracts
             use_hybrid_mode: false,        // Disabled: Use traditional privacy only
-            cleanup_interval: 3600,        // 1 hour
+            circuit_complexity: DiamondCircuitComplexity::default(),
+            cleanup_interval: 3600, // 1 hour
         }
     }
 }
@@ -61,7 +81,8 @@ impl EnhancedPrivacyConfig {
             diamond_io_config: RealDiamondIOConfig::testing(),
             enable_real_diamond_io: false, // Disabled: DiamondIO only for smart contracts
             use_hybrid_mode: false,        // Disabled: Use traditional privacy only
-            cleanup_interval: 300,         // 5 minutes for testing
+            circuit_complexity: DiamondCircuitComplexity::Simple,
+            cleanup_interval: 300, // 5 minutes for testing
         }
     }
 
@@ -78,7 +99,8 @@ impl EnhancedPrivacyConfig {
             diamond_io_config: RealDiamondIOConfig::production(),
             enable_real_diamond_io: false, // Disabled: DiamondIO only for smart contracts
             use_hybrid_mode: false,        // Disabled: Use traditional privacy only
-            cleanup_interval: 7200,        // 2 hours
+            circuit_complexity: DiamondCircuitComplexity::High,
+            cleanup_interval: 7200, // 2 hours
         }
     }
 }

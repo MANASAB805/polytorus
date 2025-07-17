@@ -8,7 +8,8 @@
 
 use polytorus::{
     crypto::{
-        diamond_privacy::{DiamondCircuitComplexity, DiamondPrivacyConfig, DiamondPrivacyProvider},
+        diamond_privacy::{DiamondPrivacyConfig, DiamondPrivacyProvider},
+        enhanced_privacy::DiamondCircuitComplexity,
         privacy::{PrivacyConfig, PrivacyProvider},
         transaction::Transaction,
     },
@@ -348,8 +349,8 @@ fn test_multiple_inputs_outputs_private_transaction() {
 fn test_diamond_privacy_config_creation() {
     // Test default configuration (DiamondIO disabled by default)
     let default_config = DiamondPrivacyConfig::default();
-    assert!(!default_config.enable_diamond_obfuscation); // Disabled by default now
-    assert!(!default_config.enable_hybrid_privacy); // Disabled by default now
+    assert!(!default_config.enable_diamond_obfuscation()); // Disabled by default now
+    assert!(!default_config.enable_hybrid_privacy()); // Disabled by default now
     assert!(matches!(
         default_config.circuit_complexity,
         DiamondCircuitComplexity::Medium
@@ -357,13 +358,13 @@ fn test_diamond_privacy_config_creation() {
 
     // Test custom configuration with DiamondIO enabled for testing
     let test_config = DiamondPrivacyConfig {
-        enable_diamond_obfuscation: true,
-        enable_hybrid_privacy: true,
+        enable_real_diamond_io: true,
+        use_hybrid_mode: true,
         ..Default::default()
     };
 
-    assert!(test_config.enable_diamond_obfuscation);
-    assert!(test_config.enable_hybrid_privacy);
+    assert!(test_config.enable_diamond_obfuscation());
+    assert!(test_config.enable_hybrid_privacy());
     assert!(matches!(
         test_config.circuit_complexity,
         DiamondCircuitComplexity::Medium
@@ -389,8 +390,8 @@ async fn test_diamond_privacy_provider_creation() {
 
     // Test with DiamondIO explicitly enabled
     let enabled_config = DiamondPrivacyConfig {
-        enable_diamond_obfuscation: true,
-        enable_hybrid_privacy: true,
+        enable_real_diamond_io: true,
+        use_hybrid_mode: true,
         ..Default::default()
     };
 

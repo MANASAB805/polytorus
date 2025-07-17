@@ -1,0 +1,84 @@
+# Database Storage Configuration for Polytorus Smart Contracts
+# This configuration enables PostgreSQL and Redis for contract state persistence
+
+[database_storage]
+# Enable fallback to in-memory storage if databases are unavailable
+fallback_to_memory = true
+# Connection timeout in seconds
+connection_timeout_secs = 30
+# Maximum connection pool size
+max_connections = 20
+# Enable SSL/TLS encryption
+use_ssl = false
+
+# PostgreSQL Configuration
+[database_storage.postgres]
+host = "localhost"
+port = 5432
+database = "polytorus"
+username = "polytorus"
+password = "polytorus"
+schema = "smart_contracts"
+max_connections = 20
+
+# Redis Configuration
+[database_storage.redis]
+url = "redis://localhost:6379"
+# password = "your_redis_password"  # Uncomment if Redis requires authentication
+database = 0
+max_connections = 20
+key_prefix = "polytorus:contracts:"
+ttl_seconds = 3600  # 1 hour cache TTL
+
+# Example configurations for different environments:
+
+# Development Environment
+[development.database_storage]
+fallback_to_memory = true
+connection_timeout_secs = 10
+
+[development.database_storage.postgres]
+host = "localhost"
+port = 5432
+database = "polytorus_dev"
+username = "dev_user"
+password = "dev_password"
+schema = "smart_contracts"
+max_connections = 5
+
+[development.database_storage.redis]
+url = "redis://localhost:6379"
+database = 1
+max_connections = 5
+key_prefix = "polytorus:dev:contracts:"
+ttl_seconds = 1800  # 30 minutes
+
+# Production Environment
+[production.database_storage]
+fallback_to_memory = false  # Strict mode - fail if databases unavailable
+connection_timeout_secs = 60
+use_ssl = true
+
+[production.database_storage.postgres]
+host = "postgres.example.com"
+port = 5432
+database = "polytorus_prod"
+username = "prod_user"
+password = "secure_password"
+schema = "smart_contracts"
+max_connections = 50
+
+[production.database_storage.redis]
+url = "rediss://redis.example.com:6380"  # SSL Redis
+password = "redis_secure_password"
+database = 0
+max_connections = 50
+key_prefix = "polytorus:prod:contracts:"
+ttl_seconds = 7200  # 2 hours
+
+# Testing Environment
+[testing.database_storage]
+fallback_to_memory = true
+connection_timeout_secs = 5
+
+# No external databases for testing - uses in-memory fallback only

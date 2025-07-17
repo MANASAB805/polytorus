@@ -171,7 +171,7 @@ EOF
 cp config/testnet/node1.toml config/testnet/node2.toml
 sed -i 's/8001/8002/g' config/testnet/node2.toml
 
-cp config/testnet/node1.toml config/testnet/node3.toml  
+cp config/testnet/node1.toml config/testnet/node3.toml
 sed -i 's/8001/8003/g' config/testnet/node3.toml
 
 cp config/testnet/node1.toml config/testnet/node4.toml
@@ -328,7 +328,7 @@ pub struct BootstrapManager {
 # 1. Node startup test
 ./scripts/test_node_startup.sh
 
-# 2. P2P connectivity test  
+# 2. P2P connectivity test
 ./scripts/test_p2p_connectivity.sh
 
 # 3. Transaction propagation test
@@ -430,7 +430,7 @@ PolyTorus can deploy **high-quality private testnets today** and has achieved **
 
 **Recommended Approach:**
 1. **Phase 1 (Immediate)**: Private consortium testnet
-2. **Phase 2 (2-4 weeks)**: Semi-private testnet  
+2. **Phase 2 (2-4 weeks)**: Semi-private testnet
 3. **Phase 3 (1-2 months)**: Public testnet
 
 This phased approach minimizes risks while ensuring reliable testnet publication.

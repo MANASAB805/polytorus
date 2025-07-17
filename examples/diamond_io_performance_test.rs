@@ -1,4 +1,4 @@
-use polytorus::diamond_io_integration_new::{PrivacyEngineConfig, PrivacyEngineIntegration};
+use polytorus::diamond_io_integration_unified::{PrivacyEngineConfig, PrivacyEngineIntegration};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

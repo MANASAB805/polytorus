@@ -147,23 +147,23 @@ echo -e "\n${PURPLE}🌐 Testing HTTP API Endpoints...${NC}"
 test_http_endpoint() {
     local port=$1
     local node_name=$2
-    
+
     echo -e "${CYAN}Testing $node_name HTTP API (port $port)...${NC}"
-    
+
     # Test health endpoint
     if timeout 5 curl -s "http://127.0.0.1:$port/health" > /dev/null 2>&1; then
         echo -e "${GREEN}  ✅ Health endpoint responding${NC}"
     else
         echo -e "${YELLOW}  ⚠️  Health endpoint not responding${NC}"
     fi
-    
+
     # Test status endpoint
     if timeout 5 curl -s "http://127.0.0.1:$port/status" > /dev/null 2>&1; then
         echo -e "${GREEN}  ✅ Status endpoint responding${NC}"
     else
         echo -e "${YELLOW}  ⚠️  Status endpoint not responding${NC}"
     fi
-    
+
     # Test stats endpoint
     if timeout 5 curl -s "http://127.0.0.1:$port/stats" > /dev/null 2>&1; then
         echo -e "${GREEN}  ✅ Stats endpoint responding${NC}"
@@ -182,7 +182,7 @@ echo -e "\n${PURPLE}📊 Network Statistics...${NC}"
 for port in 9001 9002 9003; do
     node_num=$((port - 9000))
     echo -e "${CYAN}Node $node_num Statistics:${NC}"
-    
+
     timeout 3 curl -s "http://127.0.0.1:$port/stats" 2>/dev/null | head -c 200 || echo -e "${YELLOW}  Stats unavailable${NC}"
     echo ""
 done
@@ -213,7 +213,7 @@ sleep 5
 for port in 9002 9003; do
     node_num=$((port - 9000))
     echo -e "${CYAN}Checking Node $node_num for transaction...${NC}"
-    
+
     STATS=$(timeout 3 curl -s "http://127.0.0.1:$port/stats" 2>/dev/null || echo "")
     if [[ "$STATS" == *"transaction"* ]] || [[ "$STATS" == *"pending"* ]]; then
         echo -e "${GREEN}  ✅ Node $node_num shows transaction activity${NC}"
@@ -228,14 +228,14 @@ echo -e "\n${PURPLE}📝 Log Analysis...${NC}"
 analyze_logs() {
     local log_file=$1
     local node_name=$2
-    
+
     echo -e "${CYAN}$node_name Log Analysis:${NC}"
-    
+
     if [ -f "$log_file" ]; then
         # Check for network connections
         local connections=$(grep -i "connect" "$log_file" 2>/dev/null | wc -l)
         echo -e "  Connection attempts: $connections"
-        
+
         # Check for errors
         local errors=$(grep -i "error\|fail" "$log_file" 2>/dev/null | wc -l)
         if [ $errors -gt 0 ]; then
@@ -245,11 +245,11 @@ analyze_logs() {
         else
             echo -e "${GREEN}  ✅ No errors detected${NC}"
         fi
-        
+
         # Check for network events
         local network_events=$(grep -i "peer\|network\|p2p" "$log_file" 2>/dev/null | wc -l)
         echo -e "  Network events: $network_events"
-        
+
         # Show recent log entries
         echo -e "  Recent activity:"
         tail -3 "$log_file" 2>/dev/null | sed 's/^/    /' || echo "    No recent activity"

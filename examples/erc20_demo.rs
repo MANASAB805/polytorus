@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     let data_context = DataContext::new(std::path::PathBuf::from(&temp_dir));
     data_context.ensure_directories()?;
     let state = ContractState::new(&data_context.contracts_db_path)?;
-    let engine = ContractEngine::new(state)?;
+    let mut engine = ContractEngine::new(state)?;
 
     // Deploy a sample ERC20 token
     println!("\n🔧 Deploying ERC20 token contract...");
@@ -33,7 +33,6 @@ async fn main() -> Result<()> {
         18,
         1_000_000_000, // 1 billion tokens
         "alice".to_string(),
-        "erc20_poly".to_string(),
     )?;
 
     println!("✅ Contract deployed at: {contract_address}");
@@ -211,7 +210,6 @@ async fn main() -> Result<()> {
         8,          // Different decimals
         10_000_000, // 10 million tokens
         "dave".to_string(),
-        "erc20_util".to_string(),
     )?;
 
     println!("✅ Second contract deployed at: {contract2_address}");

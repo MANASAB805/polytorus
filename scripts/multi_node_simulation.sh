@@ -30,7 +30,7 @@ echo ""
 # Cleanup function
 cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
-    
+
     # Kill all background processes
     if [[ -f "/tmp/polytorus_pids.txt" ]]; then
         while read -r pid; do
@@ -41,13 +41,13 @@ cleanup() {
         done < "/tmp/polytorus_pids.txt"
         rm -f "/tmp/polytorus_pids.txt"
     fi
-    
+
     # Clean up data directories
     if [[ -d "./data/simulation" ]]; then
         echo -e "   Cleaning up data directories"
         rm -rf "./data/simulation"
     fi
-    
+
     echo -e "${GREEN}✅ Cleanup completed${NC}"
     exit 0
 }
@@ -66,9 +66,9 @@ for ((i=0; i<NUM_NODES; i++)); do
     PORT=$((BASE_PORT + i))
     P2P_PORT=$((BASE_P2P_PORT + i))
     DATA_DIR="./data/simulation/$NODE_ID"
-    
+
     mkdir -p "$DATA_DIR"
-    
+
     # Create node-specific config file
     CONFIG_FILE="$DATA_DIR/config.toml"
     cat > "$CONFIG_FILE" << EOF
@@ -86,13 +86,13 @@ max_block_size = 1048576
 listen_addr = "127.0.0.1:$P2P_PORT"
 bootstrap_peers = [
 EOF
-    
+
     # Add bootstrap peers (previous nodes)
     for ((j=0; j<i; j++)); do
         PEER_PORT=$((BASE_P2P_PORT + j))
         echo "    \"127.0.0.1:$PEER_PORT\"," >> "$CONFIG_FILE"
     done
-    
+
     cat >> "$CONFIG_FILE" << EOF
 ]
 max_peers = 50
@@ -108,7 +108,7 @@ sync_interval = 60
 level = "INFO"
 output = "console"
 EOF
-    
+
     echo -e "   ✅ Node $i config created (port: $PORT, p2p: $P2P_PORT)"
 done
 
@@ -121,9 +121,9 @@ for ((i=0; i<NUM_NODES; i++)); do
     PORT=$((BASE_PORT + i))
     P2P_PORT=$((BASE_P2P_PORT + i))
     DATA_DIR="./data/simulation/$NODE_ID"
-    
+
     echo -e "   Starting ${NODE_ID} (HTTP: $PORT, P2P: $P2P_PORT)"
-    
+
     # Start node in background
     POLYTORUS_CONFIG="$DATA_DIR/config.toml" \
     POLYTORUS_DATA_DIR="$DATA_DIR" \
@@ -134,11 +134,11 @@ for ((i=0; i<NUM_NODES; i++)); do
         --http-port "$PORT" \
         --modular-start \
         > "./data/simulation/$NODE_ID.log" 2>&1 &
-    
+
     NODE_PID=$!
     echo "$NODE_PID" >> "/tmp/polytorus_pids.txt"
     echo -e "   📡 Node $i started (PID: $NODE_PID)"
-    
+
     # Small delay to avoid port conflicts
     sleep 2
 done
@@ -151,7 +151,7 @@ sleep 10
 echo -e "\n${BLUE}📊 Checking node status...${NC}"
 for ((i=0; i<NUM_NODES; i++)); do
     PORT=$((BASE_PORT + i))
-    
+
     # Try to get status (if HTTP API is available)
     if curl -s "http://127.0.0.1:$PORT/status" > /dev/null 2>&1; then
         echo -e "   ✅ Node $i (port $PORT) is responding"
@@ -177,21 +177,21 @@ START_TIME=$(date +%s)
 while true; do
     CURRENT_TIME=$(date +%s)
     ELAPSED=$((CURRENT_TIME - START_TIME))
-    
+
     if [[ $ELAPSED -ge $SIMULATION_TIME ]]; then
         break
     fi
-    
+
     # Generate random transaction
     FROM_NODE=$((RANDOM % NUM_NODES))
     TO_NODE=$(((RANDOM % (NUM_NODES - 1) + FROM_NODE + 1) % NUM_NODES))
     AMOUNT=$((100 + RANDOM % 900))
-    
+
     FROM_PORT=$((BASE_PORT + FROM_NODE))
-    
+
     # Submit transaction (mock API call)
     TRANSACTION_DATA="{\"from\":\"wallet_node-$FROM_NODE\",\"to\":\"wallet_node-$TO_NODE\",\"amount\":$AMOUNT,\"nonce\":$TRANSACTION_COUNT}"
-    
+
     if curl -s -X POST \
         -H "Content-Type: application/json" \
         -d "$TRANSACTION_DATA" \
@@ -200,14 +200,14 @@ while true; do
     else
         echo -e "   ❌ Failed to submit TX $TRANSACTION_COUNT"
     fi
-    
+
     TRANSACTION_COUNT=$((TRANSACTION_COUNT + 1))
-    
+
     # Progress report every 10 transactions
     if [[ $((TRANSACTION_COUNT % 10)) -eq 0 ]]; then
         echo -e "   📊 Progress: ${TRANSACTION_COUNT} transactions, ${ELAPSED}/${SIMULATION_TIME}s elapsed"
     fi
-    
+
     sleep 5  # Transaction interval
 done
 
@@ -220,7 +220,7 @@ echo -e "\n${BLUE}📈 Final Statistics:${NC}"
 for ((i=0; i<NUM_NODES; i++)); do
     PORT=$((BASE_PORT + i))
     echo -e "   Node $i (port $PORT):"
-    
+
     # Try to get final stats
     if curl -s "http://127.0.0.1:$PORT/stats" 2>/dev/null; then
         echo ""

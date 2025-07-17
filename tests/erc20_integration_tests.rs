@@ -21,7 +21,7 @@ async fn test_erc20_full_workflow() -> Result<()> {
     let data_context = DataContext::new(std::path::PathBuf::from(&temp_dir));
     data_context.ensure_directories()?;
     let state = ContractState::new(&data_context.contracts_db_path)?;
-    let engine = ContractEngine::new(state)?;
+    let mut engine = ContractEngine::new(state)?;
 
     // Deploy an ERC20 contract
     let contract_address = engine.deploy_erc20_contract(
@@ -30,7 +30,6 @@ async fn test_erc20_full_workflow() -> Result<()> {
         18,
         1000000,
         "alice".to_string(),
-        "erc20_test".to_string(),
     )?;
 
     println!("Deployed ERC20 contract at: {contract_address}");
@@ -148,7 +147,7 @@ async fn test_erc20_error_cases() -> Result<()> {
     let data_context = DataContext::new(std::path::PathBuf::from(&temp_dir));
     data_context.ensure_directories()?;
     let state = ContractState::new(&data_context.contracts_db_path)?;
-    let engine = ContractEngine::new(state)?;
+    let mut engine = ContractEngine::new(state)?;
 
     // Deploy an ERC20 contract
     let contract_address = engine.deploy_erc20_contract(
@@ -157,7 +156,6 @@ async fn test_erc20_error_cases() -> Result<()> {
         18,
         1000,
         "alice".to_string(),
-        "erc20_error_test".to_string(),
     )?;
 
     // Test insufficient balance transfer
@@ -210,7 +208,7 @@ async fn test_multiple_erc20_contracts() -> Result<()> {
     let data_context = DataContext::new(std::path::PathBuf::from(&temp_dir));
     data_context.ensure_directories()?;
     let state = ContractState::new(&data_context.contracts_db_path)?;
-    let engine = ContractEngine::new(state)?;
+    let mut engine = ContractEngine::new(state)?;
 
     // Deploy multiple ERC20 contracts
     let contract1 = engine.deploy_erc20_contract(
@@ -219,7 +217,6 @@ async fn test_multiple_erc20_contracts() -> Result<()> {
         18,
         1000000,
         "alice".to_string(),
-        "erc20_tok1".to_string(),
     )?;
 
     let contract2 = engine.deploy_erc20_contract(
@@ -228,7 +225,6 @@ async fn test_multiple_erc20_contracts() -> Result<()> {
         8,
         500000,
         "bob".to_string(),
-        "erc20_tok2".to_string(),
     )?;
 
     // List contracts

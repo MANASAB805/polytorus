@@ -393,7 +393,7 @@ impl PolyTorusConsensusLayer {
         true
     }
 
-    /// Mine a block by finding a valid nonce  
+    /// Mine a block by finding a valid nonce
     pub fn mine_block(&self, building_block: &BuildingBlock) -> Result<FinalizedBlock> {
         log::info!(
             "Starting to mine block at height {} with difficulty {}",

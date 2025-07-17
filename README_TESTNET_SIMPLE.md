@@ -306,7 +306,7 @@ api_base = "http://localhost:9020"
 for i in range(100):
     response = requests.post(f"{api_base}/transaction/send", json={
         "from": wallet1,
-        "to": wallet2, 
+        "to": wallet2,
         "amount": 1.0 + i * 0.1
     })
     print(f"Transaction {i}: {response.status_code}")

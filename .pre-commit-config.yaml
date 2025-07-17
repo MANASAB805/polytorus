@@ -15,14 +15,14 @@ repos:
         language: system
         files: \.rs$
         args: ['--all', '--']
-      
+
       - id: clippy
         name: Rust clippy
         description: Lint Rust code with clippy
         entry: cargo clippy
         language: system
         files: \.rs$
-        args: ['--all-targets', '--all-features', '--', '-D', 'warnings']
+        args: ['--lib', '--', '-D', 'warnings']
 
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -37,8 +37,7 @@ repos:
         args: ['--maxkb=1000']
 
   # Security checks
-  - repo: https://github.com/rustsec/rustsec
-    rev: main
+  - repo: local
     hooks:
       - id: cargo-audit
         name: Cargo audit

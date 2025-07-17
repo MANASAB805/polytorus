@@ -10,7 +10,7 @@
 //! developed, tested, and deployed:
 //!
 //! * **✅ Consensus Layer**: Fully implemented PoW consensus with comprehensive validation
-//! * **✅ Data Availability Layer**: Sophisticated Merkle proof system with 15 comprehensive tests  
+//! * **✅ Data Availability Layer**: Sophisticated Merkle proof system with 15 comprehensive tests
 //! * **✅ Settlement Layer**: Working optimistic rollup with fraud proofs and 13 tests
 //! * **⚠️ Execution Layer**: Hybrid account/eUTXO model (needs more tests)
 //! * **⚠️ Unified Orchestrator**: Event-driven coordination (needs integration tests)
@@ -22,7 +22,7 @@
 //! - **Diamond IO**: Indistinguishability obfuscation for privacy
 //! - **Verkle Trees**: Efficient cryptographic accumulators
 //!
-//! ### 🏗️ Modular Architecture  
+//! ### 🏗️ Modular Architecture
 //! - **Layer Separation**: Independent development and optimization
 //! - **Pluggable Components**: Trait-based interfaces for flexibility
 //! - **Event-Driven Communication**: Sophisticated message bus system
@@ -49,7 +49,7 @@
 //! ## Module Organization
 //!
 //! - [`modular`] - Core modular blockchain architecture (primary implementation)
-//! - [`diamond_io_integration`] - Privacy layer with indistinguishability obfuscation  
+//! - [`diamond_io_integration`] - Privacy layer with indistinguishability obfuscation
 //! - [`crypto`] - Cryptographic primitives (ECDSA, FN-DSA, Verkle trees)
 //! - [`network`] - P2P networking with priority queues and health monitoring
 //! - [`smart_contract`] - WASM smart contract engine with ERC20 support
@@ -68,9 +68,10 @@
 pub mod modular;
 
 // Diamond IO integration
-pub mod diamond_io_integration;
-pub mod diamond_io_integration_new;
+pub mod diamond_io_integration_unified;
 pub mod diamond_smart_contracts;
+
+// Legacy storage module has been removed - functionality moved to modular/storage.rs
 
 // Legacy modules - maintained for backward compatibility
 pub mod blockchain;

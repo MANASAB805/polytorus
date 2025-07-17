@@ -6,7 +6,9 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Result;
+use redis::{aio::ConnectionManager, AsyncCommands, Client as RedisClient};
 use serde::{Deserialize, Serialize};
+use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use tokio::{sync::RwLock, time::timeout};
 
 use super::unified_engine::{
@@ -102,16 +104,18 @@ pub struct DatabaseContractStorage {
     connection_stats: Arc<RwLock<ConnectionStats>>,
 }
 
-/// PostgreSQL connection pool (placeholder for actual implementation)
+/// PostgreSQL connection pool
 pub struct PostgresConnectionPool {
-    _config: PostgresConfig,
-    _active_connections: Arc<RwLock<u32>>,
+    pool: PgPool,
+    config: PostgresConfig,
+    active_connections: Arc<RwLock<u32>>,
 }
 
-/// Redis connection pool (placeholder for actual implementation)  
+/// Redis connection pool
 pub struct RedisConnectionPool {
-    _config: RedisConfig,
-    _active_connections: Arc<RwLock<u32>>,
+    manager: ConnectionManager,
+    config: RedisConfig,
+    active_connections: Arc<RwLock<u32>>,
 }
 
 /// Connection statistics
@@ -123,6 +127,34 @@ pub struct ConnectionStats {
     pub failed_queries: u64,
     pub cache_hits: u64,
     pub cache_misses: u64,
+}
+
+/// Database connectivity status
+#[derive(Debug, Clone)]
+pub struct DatabaseConnectivityStatus {
+    pub postgres_connected: bool,
+    pub redis_connected: bool,
+    pub fallback_available: bool,
+}
+
+/// Database information
+#[derive(Debug, Clone)]
+pub struct DatabaseInfo {
+    pub postgres_size_bytes: u64,
+    pub redis_memory_usage_bytes: u64,
+    pub memory_fallback_entries: usize,
+    pub total_contracts: usize,
+    pub total_state_entries: usize,
+    pub total_executions: usize,
+}
+
+/// PostgreSQL database information
+#[derive(Debug, Clone)]
+pub struct PostgresDatabaseInfo {
+    pub size_bytes: u64,
+    pub contracts_count: usize,
+    pub state_entries_count: usize,
+    pub executions_count: usize,
 }
 
 impl DatabaseContractStorage {
@@ -204,7 +236,18 @@ impl DatabaseContractStorage {
 
     /// Get connection statistics
     pub async fn get_stats(&self) -> ConnectionStats {
-        self.connection_stats.read().await.clone()
+        let mut stats = self.connection_stats.read().await.clone();
+
+        // Update connection counts from actual pools
+        if let Some(postgres) = &self.postgres_pool {
+            stats.postgres_connections = postgres.get_connection_count().await;
+        }
+
+        if let Some(redis) = &self.redis_pool {
+            stats.redis_connections = redis.get_connection_count().await;
+        }
+
+        stats
     }
 
     /// Store data in Redis cache
@@ -219,7 +262,10 @@ impl DatabaseContractStorage {
                 Err(e) => {
                     let mut stats = self.connection_stats.write().await;
                     stats.failed_queries += 1;
-                    eprintln!("Redis cache store failed: {}", e);
+                    if !self.config.fallback_to_memory {
+                        return Err(anyhow::anyhow!("Redis cache store failed: {}", e));
+                    }
+                    eprintln!("Redis cache store failed, using fallback: {}", e);
                 }
             }
         }
@@ -285,8 +331,9 @@ impl DatabaseContractStorage {
                     let mut stats = self.connection_stats.write().await;
                     stats.failed_queries += 1;
                     if !self.config.fallback_to_memory {
-                        return Err(e);
+                        return Err(anyhow::anyhow!("PostgreSQL store failed: {}", e));
                     }
+                    eprintln!("PostgreSQL store failed, using fallback: {}", e);
                 }
             }
         }
@@ -339,6 +386,85 @@ impl DatabaseContractStorage {
             .map(|r| r.key_prefix.as_str())
             .unwrap_or("");
         format!("{}state:{}:{}", prefix, contract, key)
+    }
+
+    /// Check database connectivity
+    pub async fn check_connectivity(&self) -> Result<DatabaseConnectivityStatus> {
+        let mut status = DatabaseConnectivityStatus {
+            postgres_connected: false,
+            redis_connected: false,
+            fallback_available: self.config.fallback_to_memory,
+        };
+
+        // Check PostgreSQL connectivity
+        if let Some(postgres) = &self.postgres_pool {
+            status.postgres_connected = postgres.check_health().await.is_ok();
+        }
+
+        // Check Redis connectivity
+        if let Some(redis) = &self.redis_pool {
+            status.redis_connected = redis.check_health().await.is_ok();
+        }
+
+        Ok(status)
+    }
+
+    /// Clear all cached data
+    pub async fn clear_cache(&self) -> Result<()> {
+        // Clear Redis cache
+        if let Some(redis) = &self.redis_pool {
+            if let Err(e) = redis.flush_db().await {
+                eprintln!("Failed to clear Redis cache: {}", e);
+            }
+        }
+
+        // Clear memory fallback
+        if self.config.fallback_to_memory {
+            let mut memory = self.memory_fallback.write().await;
+            memory.clear();
+        }
+
+        Ok(())
+    }
+
+    /// Get database size information
+    pub async fn get_database_info(&self) -> Result<DatabaseInfo> {
+        let mut info = DatabaseInfo {
+            postgres_size_bytes: 0,
+            redis_memory_usage_bytes: 0,
+            memory_fallback_entries: 0,
+            total_contracts: 0,
+            total_state_entries: 0,
+            total_executions: 0,
+        };
+
+        // Get memory fallback info
+        if self.config.fallback_to_memory {
+            let memory = self.memory_fallback.read().await;
+            info.memory_fallback_entries = memory.len();
+
+            for key in memory.keys() {
+                if key.starts_with("contracts:") {
+                    info.total_contracts += 1;
+                } else if key.starts_with("contract_state:") {
+                    info.total_state_entries += 1;
+                } else if key.starts_with("execution_history:") {
+                    info.total_executions += 1;
+                }
+            }
+        }
+
+        // Get PostgreSQL info
+        if let Some(postgres) = &self.postgres_pool {
+            if let Ok(pg_info) = postgres.get_database_info().await {
+                info.postgres_size_bytes = pg_info.size_bytes;
+                info.total_contracts = pg_info.contracts_count;
+                info.total_state_entries = pg_info.state_entries_count;
+                info.total_executions = pg_info.executions_count;
+            }
+        }
+
+        Ok(info)
     }
 }
 
@@ -719,76 +845,510 @@ impl ContractStateStorage for DatabaseContractStorage {
 
 impl PostgresConnectionPool {
     pub async fn new(config: PostgresConfig) -> Result<Self> {
-        // Placeholder implementation - in real code would use sqlx or similar
-        Ok(Self {
-            _config: config,
-            _active_connections: Arc::new(RwLock::new(0)),
-        })
+        let database_url = format!(
+            "postgresql://{}:{}@{}:{}/{}",
+            config.username, config.password, config.host, config.port, config.database
+        );
+
+        let pool = PgPoolOptions::new()
+            .max_connections(config.max_connections)
+            .connect(&database_url)
+            .await?;
+
+        // Initialize database schema
+        let instance = Self {
+            pool,
+            config,
+            active_connections: Arc::new(RwLock::new(0)),
+        };
+
+        instance.initialize_schema().await?;
+        Ok(instance)
+    }
+
+    async fn initialize_schema(&self) -> Result<()> {
+        // Create contracts table
+        sqlx::query(&format!(
+            r#"
+            CREATE TABLE IF NOT EXISTS {}.contracts (
+                address VARCHAR(42) PRIMARY KEY,
+                data BYTEA NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+            "#,
+            self.config.schema
+        ))
+        .execute(&self.pool)
+        .await?;
+
+        // Create contract_state table
+        sqlx::query(&format!(
+            r#"
+            CREATE TABLE IF NOT EXISTS {}.contract_state (
+                state_key VARCHAR(255) PRIMARY KEY,
+                contract_address VARCHAR(42) NOT NULL,
+                key_name VARCHAR(255) NOT NULL,
+                value BYTEA NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+            "#,
+            self.config.schema
+        ))
+        .execute(&self.pool)
+        .await?;
+
+        // Create execution_history table
+        sqlx::query(&format!(
+            r#"
+            CREATE TABLE IF NOT EXISTS {}.execution_history (
+                execution_key VARCHAR(255) PRIMARY KEY,
+                contract_address VARCHAR(42) NOT NULL,
+                execution_id VARCHAR(255) NOT NULL,
+                data BYTEA NOT NULL,
+                timestamp BIGINT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+            "#,
+            self.config.schema
+        ))
+        .execute(&self.pool)
+        .await?;
+
+        // Create indexes for better performance
+        sqlx::query(&format!(
+            "CREATE INDEX IF NOT EXISTS idx_contract_state_address ON {}.contract_state(contract_address)",
+            self.config.schema
+        ))
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(&format!(
+            "CREATE INDEX IF NOT EXISTS idx_execution_history_address ON {}.execution_history(contract_address)",
+            self.config.schema
+        ))
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query(&format!(
+            "CREATE INDEX IF NOT EXISTS idx_execution_history_timestamp ON {}.execution_history(timestamp DESC)",
+            self.config.schema
+        ))
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn insert(&self, table: &str, key: &str, value: &[u8]) -> Result<()> {
-        // Placeholder - would execute actual SQL INSERT
-        println!(
-            "PostgreSQL INSERT: {} -> {} ({} bytes)",
-            table,
-            key,
-            value.len()
-        );
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let result = match table {
+            "contracts" => {
+                sqlx::query(&format!(
+                    "INSERT INTO {}.contracts (address, data) VALUES ($1, $2)
+                     ON CONFLICT (address) DO UPDATE SET data = $2, updated_at = NOW()",
+                    self.config.schema
+                ))
+                .bind(key)
+                .bind(value)
+                .execute(&self.pool)
+                .await
+            }
+            "contract_state" => {
+                let parts: Vec<&str> = key.split(':').collect();
+                if parts.len() != 2 {
+                    return Err(anyhow::anyhow!("Invalid state key format: {}", key));
+                }
+                let (contract_address, key_name) = (parts[0], parts[1]);
+
+                sqlx::query(&format!(
+                    "INSERT INTO {}.contract_state (state_key, contract_address, key_name, value)
+                     VALUES ($1, $2, $3, $4)
+                     ON CONFLICT (state_key) DO UPDATE SET value = $4, updated_at = NOW()",
+                    self.config.schema
+                ))
+                .bind(key)
+                .bind(contract_address)
+                .bind(key_name)
+                .bind(value)
+                .execute(&self.pool)
+                .await
+            }
+            "execution_history" => {
+                let parts: Vec<&str> = key.split(':').collect();
+                if parts.len() != 2 {
+                    return Err(anyhow::anyhow!("Invalid execution key format: {}", key));
+                }
+                let (contract_address, execution_id) = (parts[0], parts[1]);
+
+                // Extract timestamp from the execution data
+                let execution: ContractExecutionRecord = bincode::deserialize(value)?;
+
+                sqlx::query(&format!(
+                    "INSERT INTO {}.execution_history (execution_key, contract_address, execution_id, data, timestamp)
+                     VALUES ($1, $2, $3, $4, $5)",
+                    self.config.schema
+                ))
+                .bind(key)
+                .bind(contract_address)
+                .bind(execution_id)
+                .bind(value)
+                .bind(execution.timestamp as i64)
+                .execute(&self.pool)
+                .await
+            }
+            _ => return Err(anyhow::anyhow!("Unknown table: {}", table)),
+        };
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        result?;
         Ok(())
     }
 
     pub async fn select(&self, table: &str, key: &str) -> Result<Option<Vec<u8>>> {
-        // Placeholder - would execute actual SQL SELECT
-        println!("PostgreSQL SELECT: {} -> {}", table, key);
-        Ok(None)
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let result = match table {
+            "contracts" => sqlx::query(&format!(
+                "SELECT data FROM {}.contracts WHERE address = $1",
+                self.config.schema
+            ))
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await?
+            .map(|row| row.get::<Vec<u8>, _>("data")),
+            "contract_state" => sqlx::query(&format!(
+                "SELECT value FROM {}.contract_state WHERE state_key = $1",
+                self.config.schema
+            ))
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await?
+            .map(|row| row.get::<Vec<u8>, _>("value")),
+            _ => return Err(anyhow::anyhow!("Unknown table: {}", table)),
+        };
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        Ok(result)
     }
 
     pub async fn delete(&self, table: &str, key: &str) -> Result<()> {
-        // Placeholder - would execute actual SQL DELETE
-        println!("PostgreSQL DELETE: {} -> {}", table, key);
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let result = match table {
+            "contracts" => {
+                sqlx::query(&format!(
+                    "DELETE FROM {}.contracts WHERE address = $1",
+                    self.config.schema
+                ))
+                .bind(key)
+                .execute(&self.pool)
+                .await
+            }
+            "contract_state" => {
+                sqlx::query(&format!(
+                    "DELETE FROM {}.contract_state WHERE state_key = $1",
+                    self.config.schema
+                ))
+                .bind(key)
+                .execute(&self.pool)
+                .await
+            }
+            _ => return Err(anyhow::anyhow!("Unknown table: {}", table)),
+        };
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        result?;
         Ok(())
     }
 
     pub async fn list_keys(&self, table: &str) -> Result<Vec<String>> {
-        // Placeholder - would execute actual SQL SELECT for keys
-        println!("PostgreSQL LIST_KEYS: {}", table);
-        Ok(Vec::new())
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let result = match table {
+            "contracts" => {
+                let rows = sqlx::query(&format!(
+                    "SELECT address FROM {}.contracts ORDER BY address",
+                    self.config.schema
+                ))
+                .fetch_all(&self.pool)
+                .await?;
+
+                rows.into_iter()
+                    .map(|row| row.get::<String, _>("address"))
+                    .collect()
+            }
+            "contract_state" => {
+                let rows = sqlx::query(&format!(
+                    "SELECT DISTINCT contract_address FROM {}.contract_state ORDER BY contract_address",
+                    self.config.schema
+                ))
+                .fetch_all(&self.pool)
+                .await?;
+
+                rows.into_iter()
+                    .map(|row| row.get::<String, _>("contract_address"))
+                    .collect()
+            }
+            _ => return Err(anyhow::anyhow!("Unknown table: {}", table)),
+        };
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        Ok(result)
     }
 
     pub async fn get_executions_for_contract(
         &self,
         contract: &str,
     ) -> Result<Vec<ContractExecutionRecord>> {
-        // Placeholder - would execute actual SQL query
-        println!("PostgreSQL GET_EXECUTIONS: {}", contract);
-        Ok(Vec::new())
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let rows = sqlx::query(&format!(
+            "SELECT data FROM {}.execution_history
+             WHERE contract_address = $1
+             ORDER BY timestamp DESC",
+            self.config.schema
+        ))
+        .bind(contract)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut executions = Vec::new();
+        for row in rows {
+            let data: Vec<u8> = row.get("data");
+            if let Ok(execution) = bincode::deserialize::<ContractExecutionRecord>(&data) {
+                executions.push(execution);
+            }
+        }
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        Ok(executions)
+    }
+
+    pub async fn get_connection_count(&self) -> u32 {
+        *self.active_connections.read().await
+    }
+
+    pub async fn check_health(&self) -> Result<()> {
+        sqlx::query("SELECT 1").fetch_one(&self.pool).await?;
+        Ok(())
+    }
+
+    pub async fn get_database_info(&self) -> Result<PostgresDatabaseInfo> {
+        // Get database size
+        let size_result = sqlx::query(&format!(
+            "SELECT pg_database_size('{}') as size",
+            self.config.database
+        ))
+        .fetch_one(&self.pool)
+        .await?;
+        let size_bytes: i64 = size_result.get("size");
+
+        // Get contracts count
+        let contracts_result = sqlx::query(&format!(
+            "SELECT COUNT(*) as count FROM {}.contracts",
+            self.config.schema
+        ))
+        .fetch_one(&self.pool)
+        .await?;
+        let contracts_count: i64 = contracts_result.get("count");
+
+        // Get state entries count
+        let state_result = sqlx::query(&format!(
+            "SELECT COUNT(*) as count FROM {}.contract_state",
+            self.config.schema
+        ))
+        .fetch_one(&self.pool)
+        .await?;
+        let state_entries_count: i64 = state_result.get("count");
+
+        // Get executions count
+        let executions_result = sqlx::query(&format!(
+            "SELECT COUNT(*) as count FROM {}.execution_history",
+            self.config.schema
+        ))
+        .fetch_one(&self.pool)
+        .await?;
+        let executions_count: i64 = executions_result.get("count");
+
+        Ok(PostgresDatabaseInfo {
+            size_bytes: size_bytes as u64,
+            contracts_count: contracts_count as usize,
+            state_entries_count: state_entries_count as usize,
+            executions_count: executions_count as usize,
+        })
     }
 }
 
 impl RedisConnectionPool {
     pub async fn new(config: RedisConfig) -> Result<Self> {
-        // Placeholder implementation - in real code would use redis-rs
+        let client = RedisClient::open(config.url.clone())?;
+        let manager = ConnectionManager::new(client).await?;
+
+        // Test connection
+        let mut conn = manager.clone();
+        if let Some(ref password) = config.password {
+            redis::cmd("AUTH")
+                .arg(password)
+                .query_async::<_, ()>(&mut conn)
+                .await?;
+        }
+
+        // Select database
+        redis::cmd("SELECT")
+            .arg(config.database)
+            .query_async::<_, ()>(&mut conn)
+            .await?;
+
         Ok(Self {
-            _config: config,
-            _active_connections: Arc::new(RwLock::new(0)),
+            manager,
+            config,
+            active_connections: Arc::new(RwLock::new(0)),
         })
     }
 
     pub async fn set(&self, key: &str, value: &[u8]) -> Result<()> {
-        // Placeholder - would execute actual Redis SET
-        println!("Redis SET: {} ({} bytes)", key, value.len());
-        Ok(())
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let mut conn = self.manager.clone();
+        let prefixed_key = format!("{}{}", self.config.key_prefix, key);
+
+        let result = if let Some(ttl) = self.config.ttl_seconds {
+            conn.set_ex(&prefixed_key, value, ttl).await
+        } else {
+            conn.set(&prefixed_key, value).await
+        };
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        result.map_err(|e| anyhow::anyhow!("Redis SET error: {}", e))
     }
 
     pub async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
-        // Placeholder - would execute actual Redis GET
-        println!("Redis GET: {}", key);
-        Ok(None)
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let mut conn = self.manager.clone();
+        let prefixed_key = format!("{}{}", self.config.key_prefix, key);
+
+        let result: Option<Vec<u8>> = conn
+            .get(&prefixed_key)
+            .await
+            .map_err(|e| anyhow::anyhow!("Redis GET error: {}", e))?;
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        Ok(result)
     }
 
     pub async fn delete(&self, key: &str) -> Result<()> {
-        // Placeholder - would execute actual Redis DEL
-        println!("Redis DELETE: {}", key);
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let mut conn = self.manager.clone();
+        let prefixed_key = format!("{}{}", self.config.key_prefix, key);
+
+        let _: () = conn
+            .del(&prefixed_key)
+            .await
+            .map_err(|e| anyhow::anyhow!("Redis DEL error: {}", e))?;
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        Ok(())
+    }
+
+    pub async fn exists(&self, key: &str) -> Result<bool> {
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let mut conn = self.manager.clone();
+        let prefixed_key = format!("{}{}", self.config.key_prefix, key);
+
+        let result: bool = conn
+            .exists(&prefixed_key)
+            .await
+            .map_err(|e| anyhow::anyhow!("Redis EXISTS error: {}", e))?;
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        Ok(result)
+    }
+
+    pub async fn keys(&self, pattern: &str) -> Result<Vec<String>> {
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count += 1;
+        drop(conn_count);
+
+        let mut conn = self.manager.clone();
+        let prefixed_pattern = format!("{}{}", self.config.key_prefix, pattern);
+
+        let keys: Vec<String> = conn
+            .keys(&prefixed_pattern)
+            .await
+            .map_err(|e| anyhow::anyhow!("Redis KEYS error: {}", e))?;
+
+        let mut conn_count = self.active_connections.write().await;
+        *conn_count -= 1;
+
+        // Remove prefix from returned keys
+        let prefix_len = self.config.key_prefix.len();
+        Ok(keys
+            .into_iter()
+            .map(|k| k[prefix_len..].to_string())
+            .collect())
+    }
+
+    pub async fn get_connection_count(&self) -> u32 {
+        *self.active_connections.read().await
+    }
+
+    pub async fn flush_db(&self) -> Result<()> {
+        let mut conn = self.manager.clone();
+        redis::cmd("FLUSHDB")
+            .query_async::<_, ()>(&mut conn)
+            .await
+            .map_err(|e| anyhow::anyhow!("Redis FLUSHDB error: {}", e))?;
+        Ok(())
+    }
+
+    pub async fn check_health(&self) -> Result<()> {
+        let mut conn = self.manager.clone();
+        redis::cmd("PING")
+            .query_async::<_, String>(&mut conn)
+            .await
+            .map_err(|e| anyhow::anyhow!("Redis PING error: {}", e))?;
         Ok(())
     }
 }

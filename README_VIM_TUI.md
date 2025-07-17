@@ -20,7 +20,7 @@ The primary mode for navigation and commands.
 
 #### **Navigation (hjkl style)**
 - `h` - Move left
-- `j` - Move down  
+- `j` - Move down
 - `k` - Move up
 - `l` - Move right
 - `g` - Go to top of list
@@ -45,7 +45,7 @@ The primary mode for navigation and commands.
 
 #### **Mode Switching**
 - `i`, `a`, `o` - Enter Insert mode
-- `v`, `V` - Enter Visual mode  
+- `v`, `V` - Enter Visual mode
 - `:` - Enter Command mode
 
 ### ✏️ **Insert Mode**
@@ -69,7 +69,7 @@ Execute powerful commands with `:` prefix.
 
 #### **Navigation Commands**
 - `:1` or `:dashboard` - Go to Dashboard
-- `:2` or `:wallets` - Go to Wallets  
+- `:2` or `:wallets` - Go to Wallets
 - `:3` or `:transactions` - Go to Transactions
 - `:4` or `:network` - Go to Network
 
@@ -145,7 +145,7 @@ Network status and peer management:
 5. **Return**: Automatically returns to Normal mode
 
 ### Command-Line Send
-1. **Command mode**: `:` 
+1. **Command mode**: `:`
 2. **Send command**: `send` + `Enter`
 3. **Fill form**: Same as above
 
@@ -153,7 +153,7 @@ Network status and peer management:
 
 The bottom status bar shows:
 - 📍 Current screen name
-- 🌐 Network connection status  
+- 🌐 Network connection status
 - 🔗 Current block height
 - 👥 Connected peers count
 - ⏳ Sync status
@@ -178,7 +178,7 @@ Tab         - Next screen
 
 ACTIONS:
 s           - Send transaction
-n           - New wallet  
+n           - New wallet
 r           - Refresh data
 ?           - Help
 q           - Quit
@@ -195,7 +195,7 @@ Esc         - Normal mode
 NAVIGATION:
 :1          - Dashboard
 :2          - Wallets
-:3          - Transactions  
+:3          - Transactions
 :4          - Network
 
 ACTIONS:
@@ -303,7 +303,7 @@ polytorus --tui
 - [ ] Custom key mappings
 - [ ] Vim configuration file
 
-### Enhanced Functionality  
+### Enhanced Functionality
 - [ ] Smart contract interaction
 - [ ] Mining dashboard
 - [ ] Governance voting interface

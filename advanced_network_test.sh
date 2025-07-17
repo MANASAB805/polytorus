@@ -118,11 +118,11 @@ echo -e "${CYAN}Sending test transactions...${NC}"
 for i in {1..3}; do
     port=$((9100 + i))
     echo -e "${CYAN}  Sending transaction $i to node on port $port...${NC}"
-    
+
     RESPONSE=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
         -d "{\"from\":\"wallet_$i\",\"to\":\"wallet_target\",\"amount\":$((i*100)),\"nonce\":$((2000+i))}" \
         "http://127.0.0.1:$port/send" 2>/dev/null || echo "Failed")
-    
+
     if [[ "$RESPONSE" == *"Failed"* ]]; then
         echo -e "${YELLOW}    ⚠️  Transaction $i failed${NC}"
     else
@@ -138,7 +138,7 @@ echo -e "${CYAN}Checking transaction propagation...${NC}"
 for port in 9101 9102 9103; do
     node_num=$((port - 9100))
     echo -e "${CYAN}  Node $node_num statistics:${NC}"
-    
+
     STATS=$(timeout 3 curl -s "http://127.0.0.1:$port/stats" 2>/dev/null || echo "Unavailable")
     echo "    $STATS"
 done
@@ -191,16 +191,16 @@ sleep 5
 
 if kill -0 $STRESS_NODE_PID 2>/dev/null; then
     echo -e "${GREEN}✅ Stress test node started${NC}"
-    
+
     # Send multiple concurrent transactions
     echo -e "${CYAN}Sending 10 concurrent transactions...${NC}"
-    
+
     for i in {1..10}; do
         (
             RESPONSE=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
                 -d "{\"from\":\"stress_wallet_$i\",\"to\":\"target_wallet\",\"amount\":$i,\"nonce\":$((4000+i))}" \
                 "http://127.0.0.1:9201/send" 2>/dev/null || echo "Failed")
-            
+
             if [[ "$RESPONSE" == *"Failed"* ]]; then
                 echo -e "${YELLOW}    ⚠️  Concurrent transaction $i failed${NC}"
             else
@@ -208,17 +208,17 @@ if kill -0 $STRESS_NODE_PID 2>/dev/null; then
             fi
         ) &
     done
-    
+
     # Wait for all concurrent requests to complete
     wait
-    
+
     sleep 2
-    
+
     # Check final statistics
     echo -e "${CYAN}Final stress test statistics:${NC}"
     FINAL_STATS=$(timeout 5 curl -s "http://127.0.0.1:9201/stats" 2>/dev/null || echo "Unavailable")
     echo "  $FINAL_STATS"
-    
+
     # Clean up stress test
     kill $STRESS_NODE_PID 2>/dev/null
 else
@@ -242,33 +242,33 @@ sleep 5
 
 if kill -0 $INVALID_NODE_PID 2>/dev/null; then
     echo -e "${GREEN}✅ Invalid request test node started${NC}"
-    
+
     # Test various invalid requests
     echo -e "${CYAN}Testing invalid JSON...${NC}"
     RESPONSE=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
         -d '{"invalid":"json","missing":}' \
         "http://127.0.0.1:9301/send" 2>/dev/null || echo "Connection failed")
     echo "  Response: ${RESPONSE:0:100}..."
-    
+
     echo -e "${CYAN}Testing missing fields...${NC}"
     RESPONSE=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
         -d '{"from":"wallet1"}' \
         "http://127.0.0.1:9301/send" 2>/dev/null || echo "Connection failed")
     echo "  Response: ${RESPONSE:0:100}..."
-    
+
     echo -e "${CYAN}Testing invalid amounts...${NC}"
     RESPONSE=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
         -d '{"from":"wallet1","to":"wallet2","amount":-100,"nonce":1}' \
         "http://127.0.0.1:9301/send" 2>/dev/null || echo "Connection failed")
     echo "  Response: ${RESPONSE:0:100}..."
-    
+
     echo -e "${CYAN}Testing oversized request...${NC}"
     LARGE_DATA=$(printf 'x%.0s' {1..10000})
     RESPONSE=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
         -d "{\"from\":\"$LARGE_DATA\",\"to\":\"wallet2\",\"amount\":100,\"nonce\":1}" \
         "http://127.0.0.1:9301/send" 2>/dev/null || echo "Connection failed")
     echo "  Response: ${RESPONSE:0:100}..."
-    
+
     # Clean up invalid test
     kill $INVALID_NODE_PID 2>/dev/null
 else
@@ -283,7 +283,7 @@ echo -e "${CYAN}Log Analysis:${NC}"
 for log in logs/conflict-test.log logs/partition-node*.log logs/stress-test.log logs/invalid-test.log; do
     if [ -f "$log" ]; then
         echo -e "${CYAN}  $log:${NC}"
-        
+
         # Count errors
         ERROR_COUNT=$(grep -i "error\|fail\|panic" "$log" 2>/dev/null | wc -l)
         if [ $ERROR_COUNT -gt 0 ]; then
@@ -293,7 +293,7 @@ for log in logs/conflict-test.log logs/partition-node*.log logs/stress-test.log 
         else
             echo -e "${GREEN}    ✅ No errors detected${NC}"
         fi
-        
+
         # Show last few lines
         echo -e "    Last activity:"
         tail -2 "$log" 2>/dev/null | sed 's/^/      /' || echo "      No activity"

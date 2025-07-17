@@ -111,12 +111,15 @@ impl ModularArchitecture {
         &mut self,
         from: LayerType,
         to: LayerType,
-        message_type: MessageType,        data: Vec<u8>,
+        message_type: MessageType,
+        data: Vec<u8>,
     ) -> bool {
         // Get sender layer - use bounded iteration for Kani
         let mut sender_exists = false;
         for i in 0..self.layers.len() {
-            if i >= 10 { break; } // Bound the loop for Kani verification
+            if i >= 10 {
+                break;
+            } // Bound the loop for Kani verification
             if self.layers[i].layer_type == from && self.layers[i].is_active {
                 sender_exists = true;
                 break;
@@ -154,10 +157,13 @@ impl ModularArchitecture {
             LayerType::DataAvailability,
             LayerType::Execution,
             LayerType::Settlement,
-        ];        for required_layer in &required_layers {
+        ];
+        for required_layer in &required_layers {
             let mut exists = false;
             for i in 0..self.layers.len() {
-                if i >= 10 { break; } // Bound the loop for Kani verification
+                if i >= 10 {
+                    break;
+                } // Bound the loop for Kani verification
                 if self.layers[i].layer_type == *required_layer {
                     exists = true;
                     break;

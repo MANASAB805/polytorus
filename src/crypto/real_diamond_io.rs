@@ -12,7 +12,7 @@ use tracing::info;
 
 use crate::{
     crypto::privacy::{PedersenCommitment, UtxoValidityProof},
-    diamond_io_integration_new::{
+    diamond_io_integration_unified::{
         PrivacyEngineConfig, PrivacyEngineIntegration, PrivacyEngineResult,
     },
     Result,
@@ -169,13 +169,13 @@ impl RealDiamondIOProvider {
             .map_err(|e| anyhow::anyhow!("Failed to create circuit directory: {}", e))?;
 
         // Create Diamond IO circuit and register it
-        let _diamond_circuit = crate::diamond_io_integration::PrivacyCircuit {
+        let _diamond_circuit = crate::diamond_io_integration_unified::PrivacyCircuit {
             id: circuit_id.clone(),
             description: "Privacy validation circuit".to_string(),
             input_size: self.config.input_size,
             output_size: self.derive_output_size_from_proof(proof),
             topology: None,
-            circuit_type: crate::diamond_io_integration::CircuitType::Cryptographic,
+            circuit_type: crate::diamond_io_integration_unified::CircuitType::Cryptographic,
         }; // Register the circuit with Diamond IO (handled internally by new implementation)
            // self.diamond_io.register_circuit(diamond_circuit)
            //     .map_err(|e| anyhow::anyhow!("Failed to register circuit: {}", e))?;

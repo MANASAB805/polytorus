@@ -772,7 +772,7 @@ Records a transaction as sent from the current node.
 ```json
 {
   "from": "wallet_node-0",
-  "to": "wallet_node-1", 
+  "to": "wallet_node-1",
   "amount": 100,
   "nonce": 1001
 }
@@ -808,7 +808,7 @@ Records a transaction as received by the current node.
 ```json
 {
   "status": "accepted",
-  "transaction_id": "baf3ecb7-86dd-4523-9d8a-0eb90eb6da43", 
+  "transaction_id": "baf3ecb7-86dd-4523-9d8a-0eb90eb6da43",
   "message": "Transaction from wallet_node-0 to wallet_node-1 for 100 accepted"
 }
 ```
@@ -1009,11 +1009,11 @@ for i in {1..10}; do
   curl -s -X POST http://127.0.0.1:9000/send \
     -H "Content-Type: application/json" \
     -d "{\"from\":\"wallet_node-0\",\"to\":\"wallet_node-1\",\"amount\":$((i*10)),\"nonce\":$((2000+i))}"
-  
+
   curl -s -X POST http://127.0.0.1:9001/transaction \
     -H "Content-Type: application/json" \
     -d "{\"from\":\"wallet_node-0\",\"to\":\"wallet_node-1\",\"amount\":$((i*10)),\"nonce\":$((2000+i))}"
-  
+
   sleep 1
 done
 
@@ -1137,35 +1137,35 @@ use serde_json::json;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
-    
+
     // Send transaction
     let response = client
         .post("http://127.0.0.1:9000/send")
         .json(&json!({
             "from": "wallet_node-0",
-            "to": "wallet_node-1", 
+            "to": "wallet_node-1",
             "amount": 100,
             "nonce": 1001
         }))
         .send()
         .await?;
-    
+
     println!("Send response: {}", response.text().await?);
-    
+
     // Record reception
     let response = client
         .post("http://127.0.0.1:9001/transaction")
         .json(&json!({
             "from": "wallet_node-0",
             "to": "wallet_node-1",
-            "amount": 100, 
+            "amount": 100,
             "nonce": 1001
         }))
         .send()
         .await?;
-    
+
     println!("Receive response: {}", response.text().await?);
-    
+
     Ok(())
 }
 ```
@@ -1178,19 +1178,19 @@ import time
 
 def send_complete_transaction(sender_port, receiver_port, tx_data):
     """Send a complete transaction with propagation"""
-    
+
     # Step 1: Record as sent
     send_response = requests.post(
         f"http://127.0.0.1:{sender_port}/send",
         json=tx_data
     )
-    
-    # Step 2: Record as received  
+
+    # Step 2: Record as received
     receive_response = requests.post(
         f"http://127.0.0.1:{receiver_port}/transaction",
         json=tx_data
     )
-    
+
     return send_response.json(), receive_response.json()
 
 # Example usage
@@ -1217,13 +1217,13 @@ async function sendCompleteTransaction(senderPort, receiverPort, txData) {
             `http://127.0.0.1:${senderPort}/send`,
             txData
         );
-        
+
         // Step 2: Record as received
         const receiveResponse = await axios.post(
-            `http://127.0.0.1:${receiverPort}/transaction`, 
+            `http://127.0.0.1:${receiverPort}/transaction`,
             txData
         );
-        
+
         return {
             sent: sendResponse.data,
             received: receiveResponse.data

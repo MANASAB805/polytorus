@@ -45,7 +45,7 @@ links:
 
 #### Geographic Latency Matrix
 - NA ↔ EU: 80-120ms base latency
-- NA ↔ APAC: 150-200ms base latency  
+- NA ↔ APAC: 150-200ms base latency
 - EU ↔ APAC: 200-250ms base latency
 - Intra-region: 10-50ms latency
 
@@ -71,7 +71,7 @@ routers:
     kind: linux
     image: frrouting/frr:latest
     mgmt-ipv4: 172.100.100.10
-    
+
   internet-router-eu:
     kind: linux
     image: frrouting/frr:latest
@@ -106,7 +106,7 @@ tc qdisc del dev eth0 root
 - Mining pools (high bandwidth, low latency)
 - Exchange nodes (financial infrastructure)
 
-**Europe (AS65002)**  
+**Europe (AS65002)**
 - Institutional validators (compliance-focused)
 - Academic research nodes (experimental features)
 - Regulatory monitoring nodes (compliance)
@@ -221,7 +221,7 @@ na_to_eu:
   bandwidth: 100Mbps
   packet_loss: 0.1%
 
-# Trans-Pacific link  
+# Trans-Pacific link
 na_to_apac:
   base_latency: 180ms
   jitter: 10ms
@@ -237,19 +237,19 @@ node_roles:
     connectivity: tier1_isp
     uptime: 99.9%
     resources: high
-    
+
   miner:
     connectivity: business_isp
     uptime: 99.5%
     resources: high
     mining_pool_connection: true
-    
+
   validator:
     connectivity: datacenter
     uptime: 99.8%
     resources: medium
     compliance_monitoring: true
-    
+
   light_client:
     connectivity: residential
     uptime: 95%

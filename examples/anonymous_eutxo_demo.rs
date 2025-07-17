@@ -2,7 +2,7 @@
 //!
 //! This example demonstrates the complete anonymous eUTXO workflow with:
 //! - Stealth addresses for recipient privacy
-//! - Ring signatures for transaction unlinkability  
+//! - Ring signatures for transaction unlinkability
 //! - Zero-knowledge proofs for amount privacy
 //! - Diamond IO obfuscation for maximum privacy
 

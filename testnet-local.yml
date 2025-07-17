@@ -149,7 +149,7 @@ topology:
     - endpoints: ["bootstrap:eth2", "miner-2:eth1"]
     - endpoints: ["bootstrap:eth3", "validator:eth1"]
     - endpoints: ["bootstrap:eth4", "api-gateway:eth1"]
-    
+
     # Direct miner connections for better network redundancy
     - endpoints: ["miner-1:eth2", "miner-2:eth2"]
     - endpoints: ["miner-1:eth3", "validator:eth2"]
