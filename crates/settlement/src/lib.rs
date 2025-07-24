@@ -112,7 +112,7 @@ impl PolyTorusSettlementLayer {
             // State roots differ, fraud proof might be valid
             
             // Check if the proof data is valid (simplified check)
-            if proof.proof_data.len() > 0 && proof.batch_id == batch.batch_id {
+            if !proof.proof_data.is_empty() && proof.batch_id == batch.batch_id {
                 // Verify the execution was actually incorrect
                 // This would involve re-executing all transactions in the batch
                 return Ok(true);
@@ -221,7 +221,7 @@ impl PolyTorusSettlementLayer {
         let mut hasher = Sha256::new();
         hasher.update(&batch.batch_id);
         hasher.update(&batch.new_state_root);
-        hasher.update(&batch.timestamp.to_be_bytes());
+        hasher.update(batch.timestamp.to_be_bytes());
         hex::encode(hasher.finalize())
     }
 
@@ -465,6 +465,6 @@ mod tests {
         
         let history = layer.get_settlement_history(10).await.unwrap();
         // History will be empty initially as batches need to be finalized
-        assert!(history.len() == 0);
+        assert!(history.is_empty());
     }
 }

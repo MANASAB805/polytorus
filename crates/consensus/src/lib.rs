@@ -133,8 +133,8 @@ impl PolyTorusConsensusLayer {
     fn calculate_block_hash(&self, block: &Block) -> Hash {
         let mut hasher = Sha256::new();
         hasher.update(&block.parent_hash);
-        hasher.update(&block.number.to_be_bytes());
-        hasher.update(&block.timestamp.to_be_bytes());
+        hasher.update(block.number.to_be_bytes());
+        hasher.update(block.timestamp.to_be_bytes());
         hasher.update(&block.state_root);
         hasher.update(&block.transaction_root);
         hasher.update(&block.validator);
@@ -230,8 +230,8 @@ impl PolyTorusConsensusLayer {
     pub fn get_pending_transactions(&self, limit: usize) -> Vec<Transaction> {
         let mut state = self.chain_state.lock().unwrap();
         let len = state.pending_transactions.len();
-        let transactions = state.pending_transactions.split_off(len.saturating_sub(limit));
-        transactions
+        
+        state.pending_transactions.split_off(len.saturating_sub(limit))
     }
 
     /// Create new block proposal

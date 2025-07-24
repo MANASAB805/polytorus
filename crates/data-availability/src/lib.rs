@@ -202,7 +202,7 @@ impl PolyTorusDataAvailabilityLayer {
         
         // Simulate replication to peers
         let replicas: Vec<Address> = (0..self.config.replication_factor)
-            .map(|i| format!("peer_{}", i))
+            .map(|i| format!("peer_{i}"))
             .collect();
         
         // Store replicas information  
@@ -309,7 +309,7 @@ impl DataAvailabilityLayer for PolyTorusDataAvailabilityLayer {
             Ok(Some(entry.data.clone()))
         } else {
             // Try to request from network
-            log::info!("Data {} not found locally, requesting from network", hash);
+            log::info!("Data {hash} not found locally, requesting from network");
             Ok(None)
         }
     }
@@ -340,7 +340,7 @@ impl DataAvailabilityLayer for PolyTorusDataAvailabilityLayer {
         let mut network = self.network_state.lock().unwrap();
         
         // Add to pending requests
-        let requesters = network.data_requests.entry(hash.clone()).or_insert_with(Vec::new);
+        let requesters = network.data_requests.entry(hash.clone()).or_default();
         requesters.push("self".to_string());
         
         log::info!("Requested data {} from network", hash);

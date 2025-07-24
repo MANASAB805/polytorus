@@ -246,8 +246,8 @@ impl PolyTorusExecutionLayer {
         
         for (addr, state) in sorted_accounts {
             hasher.update(addr.as_bytes());
-            hasher.update(&state.balance.to_be_bytes());
-            hasher.update(&state.nonce.to_be_bytes());
+            hasher.update(state.balance.to_be_bytes());
+            hasher.update(state.nonce.to_be_bytes());
         }
         
         hex::encode(hasher.finalize())
