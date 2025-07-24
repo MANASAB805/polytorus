@@ -101,7 +101,7 @@ impl PolyTorusExecutionLayer {
         })?;
         
         linker.func_wrap("env", "transfer", |caller: wasmtime::Caller<'_, ExecutionStore>, 
-                         from: u32, to: u32, amount: u64| -> i32 {
+                        from: u32, to: u32, amount: u64| -> i32 {
             // Implement transfer logic using all parameters
             let store_data = caller.data();
             if from != to && amount > 0 && store_data.gas_remaining >= amount {
