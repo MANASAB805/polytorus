@@ -199,8 +199,8 @@ impl UtxoDemo {
         let chain_height = self.consensus_layer.get_block_height().await?;
         let current_slot = self.consensus_layer.get_current_slot().await?;
         let canonical_chain = self.consensus_layer.get_canonical_chain().await?;
-        println!("   - Chain Height: {}", chain_height);
-        println!("   - Current Slot: {}", current_slot);
+        println!("   - Chain Height: {chain_height}");
+        println!("   - Current Slot: {current_slot}");
         println!("   - Chain Length: {} blocks", canonical_chain.len());
 
         // Step 8: Demonstrate batch processing
@@ -225,7 +225,7 @@ impl UtxoDemo {
                 println!("   - Slot: {}", batch_result.slot);
             }
             Err(e) => {
-                println!("❌ Batch execution failed: {}", e);
+                println!("❌ Batch execution failed: {e}");
             }
         }
 

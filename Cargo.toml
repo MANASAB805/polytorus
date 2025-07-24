@@ -16,7 +16,7 @@ members = [
     "crates/execution", 
     "crates/settlement",
     "crates/consensus",
-    "crates/data-availability",
+    "crates/data-availability", "crates/wallet",
 ]
 
 resolver = "2"
