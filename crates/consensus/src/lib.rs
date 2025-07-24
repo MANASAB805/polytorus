@@ -7,7 +7,7 @@
 //! - Fork resolution and finality
 //! - eUTXO consensus with slot-based timing
 
-pub mod utxo;
+pub mod consensus_engine;
 
 use std::{
     collections::HashMap,

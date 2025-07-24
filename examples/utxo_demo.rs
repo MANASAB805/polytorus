@@ -7,8 +7,8 @@
 //! - Block mining and consensus
 //! - Rollup batch processing
 
-use execution::utxo::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
-use consensus::utxo::{PolyTorusUtxoConsensusLayer, UtxoConsensusConfig};
+use execution::execution_engine::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
+use consensus::consensus_engine::{PolyTorusUtxoConsensusLayer, UtxoConsensusConfig};
 use traits::{
     UtxoExecutionLayer, UtxoConsensusLayer, UtxoTransaction, UtxoId,
     TxInput, TxOutput, ScriptContext

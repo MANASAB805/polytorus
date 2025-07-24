@@ -7,7 +7,7 @@
 //! - Gas metering and resource management
 //! - eUTXO (Extended UTXO) transaction processing
 
-pub mod utxo;
+pub mod execution_engine;
 
 use std::{
     collections::HashMap,
