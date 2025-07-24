@@ -151,12 +151,12 @@ impl PolyTorusBlockchain {
         let tx_data = serde_json::to_vec(&transaction)?;
         let mut data_layer = self.data_availability_layer.write().await;
         let data_hash = data_layer.store_data(&tx_data).await?;
-        info!("📦 Transaction data stored: {}", data_hash);
+        info!("Transaction data stored: {data_hash}");
 
         // 3. Add to pending transactions for consensus
         let consensus = self.consensus_layer.read().await;
         consensus.add_pending_transaction(transaction)?;
-        info!("🤝 Transaction added to consensus pool");
+        info!("Transaction added to consensus pool");
 
         // Save state to disk
         self.save_to_disk().await?;
@@ -330,11 +330,11 @@ async fn main() -> Result<()> {
                 let difficulty: usize = value_str.parse()?;
                 let mut consensus = blockchain.get_consensus_layer().write().await;
                 consensus.set_difficulty(difficulty).await?;
-                println!("Mining difficulty set to {}", difficulty);
+                println!("Mining difficulty set to {difficulty}");
             } else {
                 let consensus = blockchain.get_consensus_layer().read().await;
                 let current_difficulty = consensus.get_difficulty().await?;
-                println!("Current mining difficulty: {}", current_difficulty);
+                println!("Current mining difficulty: {current_difficulty}");
             }
         }
         
@@ -348,10 +348,10 @@ async fn main() -> Result<()> {
                 println!("Pending transactions ({}):", pending_transactions.len());
                 for (i, tx) in pending_transactions.iter().enumerate() {
                     println!("  {}. {} -> {} ({})", 
-                             i + 1, 
-                             tx.from, 
-                             tx.to.as_ref().unwrap_or(&"N/A".to_string()), 
-                             tx.value);
+                            i + 1, 
+                            tx.from, 
+                            tx.to.as_ref().unwrap_or(&"N/A".to_string()), 
+                            tx.value);
                 }
             }
         }
@@ -437,7 +437,7 @@ mod tests {
         // Now create a block
         let result = blockchain.create_block().await;
         if let Err(e) = &result {
-            println!("Block creation failed: {}", e);
+            println!("Block creation failed: {e}");
         }
         assert!(result.is_ok());
     }
