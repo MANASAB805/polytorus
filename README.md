@@ -11,49 +11,7 @@
 
 PolyTorus is a revolutionary **modular blockchain platform** designed for the post-quantum era, offering unparalleled cryptographic flexibility and adaptability. Built on a cutting-edge modular architecture, it cleanly separates consensus, execution, settlement, and data availability layers, enabling unprecedented customization and optimization for diverse use cases in the quantum computing age.
 
-## 🚀 **Latest Updates: CI/CD Integration & Pre-commit Automation** (June 2025)
-
-🎯 **PolyTorus achieves production-ready CI/CD pipeline with automated code quality enforcement:**
-
-- ✅ **Automated Pre-commit Checks** - cargo fmt, clippy, and tests run before every commit
-- ✅ **Unified CI/CD Pipeline** - GitHub Actions with multi-platform support, coverage, and security
-- ✅ **Docker Production Ready** - Multi-stage builds, security scanning, and compose orchestration
-- ✅ **Environment Management** - Secure secrets handling and flexible configuration
-- ✅ **Code Quality Enforcement** - Zero warnings policy with automated formatting
-- ✅ **Security Integration** - cargo-audit, Dependabot, and vulnerability scanning
-- ✅ **Kani Verification** - Formal verification integrated into CI pipeline
-
-## 🚀 **Major Achievement: Diamond IO E2E Obfuscation Integration** (June 2025)
-
-🎉 **PolyTorus now features complete Diamond IO integration:**
-
-- ✅ **End-to-End Obfuscation** - Real Diamond IO circuit obfuscation and evaluation
-- ✅ **Indistinguishability Obfuscation** - State-of-the-art cryptographic privacy
-- ✅ **Smart Contract Privacy** - Contracts execute without revealing logic or data
-- ✅ **Modular Architecture Support** - Diamond IO integrated across all layers
-- ✅ **Performance Optimized** - Multiple modes from testing to production security
-- ✅ **Full API Compatibility** - Seamless integration with existing PolyTorus systems
-
-## 🚀 **Previous Achievement: Code Quality & Network Enhancements** (December 2024)
-
-🎯 **PolyTorus achieves zero dead code and enhanced network reliability:**
-
-- ✅ **Zero Dead Code** - Complete elimination of unused code and warnings
-- ✅ **Enhanced Network Priority Queue** - Advanced message prioritization with rate limiting
-- ✅ **Improved P2P Networking** - Robust peer management and blacklisting system
-- ✅ **Network Health Monitoring** - Comprehensive network topology and health tracking
-- ✅ **Strict Code Quality** - All code actively used, no suppressions allowed
-- ✅ **Async Performance** - Optimized async networking with bandwidth management
-- ✅ **Production Ready** - Battle-tested with comprehensive test coverage
-
 ## 🚀 Features
-
-### 🔐 **Diamond IO Privacy Layer (Latest)**
-- **Circuit Obfuscation**: Transform smart contracts into indistinguishable programs
-- **Homomorphic Evaluation**: Execute obfuscated circuits on encrypted data
-- **Multiple Security Modes**: Dummy (testing), Testing (development), Production (maximum security)
-- **E2E Privacy**: Complete obfuscation from contract creation to execution
-- **Performance Scaling**: Optimized for different security vs speed requirements
 
 ### 🏗️ **Modular Architecture (Primary System)**
 - **🔄 Execution Layer**: High-performance WASM smart contract execution with gas metering
@@ -68,13 +26,6 @@ PolyTorus is a revolutionary **modular blockchain platform** designed for the po
 - **Diamond IO Integration**: Advanced indistinguishability obfuscation (iO) for ultimate privacy
 - **Flexible Wallet System**: Users choose their preferred cryptographic backend
 - **Seamless Migration**: Easy transition between cryptographic methods
-
-### 🧮 **Diamond IO Integration**
-- **Indistinguishability Obfuscation**: State-of-the-art iO implementation for smart contracts
-- **Homomorphic Encryption**: RLWE-based encryption for private computation
-- **Circuit Obfuscation**: Transform smart contracts into indistinguishable programs
-- **Zero-Knowledge Privacy**: Execute contracts without revealing logic or data
-- **Modular Integration**: Seamlessly integrated into the PolyTorus modular architecture
 
 ### 🔧 **Advanced Capabilities**
 - **Smart Contracts**: High-performance WebAssembly (WASM) based execution engine
