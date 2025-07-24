@@ -5,6 +5,9 @@
 //! - Validator management and stake tracking
 //! - Proof-of-Work or Proof-of-Stake consensus
 //! - Fork resolution and finality
+//! - eUTXO consensus with slot-based timing
+
+pub mod utxo;
 
 use std::{
     collections::HashMap,

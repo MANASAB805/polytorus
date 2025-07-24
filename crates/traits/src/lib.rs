@@ -7,6 +7,7 @@
 //! 4. Data Availability Layer - Data storage and distribution
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Hash type for blockchain data
 pub type Hash = String;
@@ -49,13 +50,94 @@ pub struct Block {
     pub proof: Vec<u8>,
 }
 
-/// Account state
+/// eUTXO Block structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UtxoBlock {
+    pub hash: Hash,
+    pub parent_hash: Hash,
+    pub number: u64,
+    pub timestamp: u64,
+    pub slot: u64, // For slot-based consensus
+    pub transactions: Vec<UtxoTransaction>,
+    pub utxo_set_hash: Hash,
+    pub transaction_root: Hash,
+    pub validator: Address,
+    pub proof: Vec<u8>,
+}
+
+/// Account state (for compatibility with existing code)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountState {
     pub balance: u64,
     pub nonce: u64,
     pub code_hash: Option<Hash>,
     pub storage_root: Option<Hash>,
+}
+
+// ============================================================================
+// eUTXO Data Structures
+// ============================================================================
+
+/// UTXO identifier
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct UtxoId {
+    pub tx_hash: Hash,
+    pub output_index: u32,
+}
+
+/// UTXO (Unspent Transaction Output)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Utxo {
+    pub id: UtxoId,
+    pub value: u64,
+    pub script: Vec<u8>, // Script/smart contract code
+    pub datum: Option<Vec<u8>>, // Extended data (for eUTXO)
+    pub datum_hash: Option<Hash>, // Hash of the datum
+}
+
+/// Transaction input referencing a UTXO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxInput {
+    pub utxo_id: UtxoId,
+    pub redeemer: Vec<u8>, // Script input/witness
+    pub signature: Vec<u8>,
+}
+
+/// Transaction output creating a new UTXO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxOutput {
+    pub value: u64,
+    pub script: Vec<u8>, // Locking script
+    pub datum: Option<Vec<u8>>, // Associated data
+    pub datum_hash: Option<Hash>,
+}
+
+/// eUTXO Transaction structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UtxoTransaction {
+    pub hash: Hash,
+    pub inputs: Vec<TxInput>,
+    pub outputs: Vec<TxOutput>,
+    pub fee: u64,
+    pub validity_range: Option<(u64, u64)>, // (start_slot, end_slot)
+    pub script_witness: Vec<Vec<u8>>, // Witness data for scripts
+    pub auxiliary_data: Option<Vec<u8>>, // Metadata
+}
+
+/// UTXO set state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UtxoSet {
+    pub utxos: HashMap<UtxoId, Utxo>,
+    pub total_value: u64,
+}
+
+/// Script execution context for eUTXO
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptContext {
+    pub tx: UtxoTransaction,
+    pub input_index: usize,
+    pub consumed_utxos: Vec<Utxo>,
+    pub current_slot: u64,
 }
 
 // ============================================================================
@@ -69,6 +151,29 @@ pub struct ExecutionResult {
     pub gas_used: u64,
     pub receipts: Vec<TransactionReceipt>,
     pub events: Vec<Event>,
+}
+
+/// eUTXO execution result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UtxoExecutionResult {
+    pub utxo_set_hash: Hash,
+    pub consumed_utxos: Vec<UtxoId>,
+    pub created_utxos: Vec<Utxo>,
+    pub script_execution_units: u64,
+    pub receipts: Vec<UtxoTransactionReceipt>,
+    pub events: Vec<Event>,
+}
+
+/// eUTXO transaction execution receipt
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UtxoTransactionReceipt {
+    pub tx_hash: Hash,
+    pub success: bool,
+    pub script_execution_units: u64,
+    pub consumed_utxos: Vec<UtxoId>,
+    pub created_utxos: Vec<UtxoId>,
+    pub events: Vec<Event>,
+    pub script_logs: Vec<String>,
 }
 
 /// Transaction execution receipt
@@ -97,6 +202,18 @@ pub struct ExecutionBatch {
     pub prev_state_root: Hash,
     pub new_state_root: Hash,
     pub timestamp: u64,
+}
+
+/// eUTXO execution batch
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UtxoExecutionBatch {
+    pub batch_id: Hash,
+    pub transactions: Vec<UtxoTransaction>,
+    pub results: Vec<UtxoExecutionResult>,
+    pub prev_utxo_set_hash: Hash,
+    pub new_utxo_set_hash: Hash,
+    pub timestamp: u64,
+    pub slot: u64,
 }
 
 // ============================================================================
@@ -213,6 +330,40 @@ pub trait ExecutionLayer: Send + Sync {
     async fn rollback_execution(&mut self) -> Result<()>;
 }
 
+/// eUTXO Execution Layer Interface
+#[async_trait::async_trait]
+pub trait UtxoExecutionLayer: Send + Sync {
+    /// Execute a single eUTXO transaction
+    async fn execute_utxo_transaction(&mut self, tx: &UtxoTransaction) -> Result<UtxoTransactionReceipt>;
+    
+    /// Execute a batch of eUTXO transactions
+    async fn execute_utxo_batch(&mut self, transactions: Vec<UtxoTransaction>) -> Result<UtxoExecutionBatch>;
+    
+    /// Get current UTXO set hash
+    async fn get_utxo_set_hash(&self) -> Result<Hash>;
+    
+    /// Get UTXO by ID
+    async fn get_utxo(&self, utxo_id: &UtxoId) -> Result<Option<Utxo>>;
+    
+    /// Get all UTXOs for a script hash (address)
+    async fn get_utxos_by_script(&self, script_hash: &Hash) -> Result<Vec<Utxo>>;
+    
+    /// Validate script execution
+    async fn validate_script(&self, script: &[u8], redeemer: &[u8], context: &ScriptContext) -> Result<bool>;
+    
+    /// Begin UTXO execution context
+    async fn begin_utxo_execution(&mut self) -> Result<()>;
+    
+    /// Commit UTXO execution results
+    async fn commit_utxo_execution(&mut self) -> Result<Hash>;
+    
+    /// Rollback UTXO execution
+    async fn rollback_utxo_execution(&mut self) -> Result<()>;
+    
+    /// Get total value in UTXO set
+    async fn get_total_supply(&self) -> Result<u64>;
+}
+
 /// Settlement Layer Interface - 紛争解決と最終確定
 #[async_trait::async_trait] 
 pub trait SettlementLayer: Send + Sync {
@@ -267,6 +418,49 @@ pub trait ConsensusLayer: Send + Sync {
     
     /// Set mining difficulty
     async fn set_difficulty(&mut self, difficulty: usize) -> Result<()>;
+}
+
+/// eUTXO Consensus Layer Interface
+#[async_trait::async_trait]
+pub trait UtxoConsensusLayer: Send + Sync {
+    /// Propose new eUTXO block
+    async fn propose_utxo_block(&mut self, block: UtxoBlock) -> Result<()>;
+    
+    /// Validate eUTXO block proposal
+    async fn validate_utxo_block(&self, block: &UtxoBlock) -> Result<bool>;
+    
+    /// Get canonical chain
+    async fn get_canonical_chain(&self) -> Result<Vec<Hash>>;
+    
+    /// Get current block height
+    async fn get_block_height(&self) -> Result<u64>;
+    
+    /// Get current slot
+    async fn get_current_slot(&self) -> Result<u64>;
+    
+    /// Get block by hash
+    async fn get_utxo_block_by_hash(&self, hash: &Hash) -> Result<Option<UtxoBlock>>;
+    
+    /// Add validated block to chain
+    async fn add_utxo_block(&mut self, block: UtxoBlock) -> Result<()>;
+    
+    /// Check if node is validator
+    async fn is_validator(&self) -> Result<bool>;
+    
+    /// Get validator set
+    async fn get_validator_set(&self) -> Result<Vec<ValidatorInfo>>;
+    
+    /// Mine a new eUTXO block
+    async fn mine_utxo_block(&mut self, transactions: Vec<UtxoTransaction>) -> Result<UtxoBlock>;
+    
+    /// Get current mining difficulty
+    async fn get_difficulty(&self) -> Result<usize>;
+    
+    /// Set mining difficulty
+    async fn set_difficulty(&mut self, difficulty: usize) -> Result<()>;
+    
+    /// Validate slot timing
+    async fn validate_slot_timing(&self, slot: u64, timestamp: u64) -> Result<bool>;
 }
 
 /// Data Availability Layer Interface - データ保存と配信

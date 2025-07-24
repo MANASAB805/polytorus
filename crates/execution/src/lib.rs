@@ -5,6 +5,9 @@
 //! - Rollup batch processing  
 //! - State management with rollback capabilities
 //! - Gas metering and resource management
+//! - eUTXO (Extended UTXO) transaction processing
+
+pub mod utxo;
 
 use std::{
     collections::HashMap,
