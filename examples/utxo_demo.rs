@@ -40,14 +40,22 @@ impl UtxoDemo {
 
     /// Create a genesis UTXO for testing
     pub async fn create_genesis_utxo(&mut self) -> anyhow::Result<UtxoId> {
-        // This would normally be done during blockchain initialization
+        // Create genesis UTXO properly using the new API
         let genesis_utxo_id = UtxoId {
             tx_hash: "genesis_tx".to_string(),
             output_index: 0,
         };
 
-        // Note: In a real implementation, genesis UTXOs would be created through proper initialization
-        // For demo purposes, we'll create a simple transfer transaction later
+        let genesis_utxo = traits::Utxo {
+            id: genesis_utxo_id.clone(),
+            value: 1_000_000, // 1M units
+            script: vec![], // Empty script = "always true"
+            datum: Some(b"Genesis UTXO".to_vec()),
+            datum_hash: Some("genesis_datum_hash".to_string()),
+        };
+
+        // Initialize genesis UTXO set properly
+        self.execution_layer.initialize_genesis_utxo_set(vec![(genesis_utxo_id.clone(), genesis_utxo)])?;
 
         println!("Created genesis UTXO: {genesis_utxo_id:?}");
         Ok(genesis_utxo_id)
@@ -172,12 +180,18 @@ impl UtxoDemo {
 
         // Step 6: Validate and add block to chain
         println!("\n🔍 Validating and Adding Block...");
+        println!("   - Block hash: {}", block.hash);
+        println!("   - Block slot: {}", block.slot);
+        println!("   - Parent hash: {}", block.parent_hash);
+        println!("   - Transactions: {}", block.transactions.len());
+        
         let is_valid = self.consensus_layer.validate_utxo_block(&block).await?;
         if is_valid {
             self.consensus_layer.add_utxo_block(block).await?;
             println!("✅ Block added to chain!");
         } else {
             println!("❌ Block validation failed!");
+            println!("   ℹ️  This may be due to strict consensus rules or slot timing");
         }
 
         // Step 7: Check consensus state

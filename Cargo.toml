@@ -50,11 +50,6 @@ rand = "0.8.5"
 name = "polytorus"
 path = "src/lib.rs"
 
-# Main binary configuration
-[[bin]]
-name = "polytorus"
-path = "src/main.rs"
-
 [dependencies]
 # Layer crates
 traits = { path = "crates/traits" }
