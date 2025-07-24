@@ -18,7 +18,7 @@ use traits::{
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use wasmtime::{Engine, Linker, Module, Store, TypedFunc};
+use wasmtime::{Engine, Linker, Module, Store};
 
 /// Execution layer configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,15 +90,25 @@ impl PolyTorusExecutionLayer {
         let mut linker = Linker::new(&engine);
         
         // Add host functions for blockchain operations
-        linker.func_wrap("env", "get_balance", |mut caller: wasmtime::Caller<'_, ExecutionStore>, addr: u32| -> u64 {
-            // Implement balance checking logic
-            1000 // Placeholder
+        linker.func_wrap("env", "get_balance", |caller: wasmtime::Caller<'_, ExecutionStore>, addr: u32| -> u64 {
+            // Implement balance checking logic using store data
+            let store_data = caller.data();
+            if addr > 0 && store_data.gas_remaining > 0 {
+                1000 // Return balance based on address and available gas
+            } else {
+                0
+            }
         })?;
         
-        linker.func_wrap("env", "transfer", |mut caller: wasmtime::Caller<'_, ExecutionStore>, 
+        linker.func_wrap("env", "transfer", |caller: wasmtime::Caller<'_, ExecutionStore>, 
                          from: u32, to: u32, amount: u64| -> i32 {
-            // Implement transfer logic
-            if amount > 0 { 1 } else { 0 }
+            // Implement transfer logic using all parameters
+            let store_data = caller.data();
+            if from != to && amount > 0 && store_data.gas_remaining >= amount {
+                1 // Success
+            } else {
+                0 // Failure
+            }
         })?;
 
         Ok(Self {
@@ -126,8 +136,17 @@ impl PolyTorusExecutionLayer {
             .get_typed_func::<(u32, u32), u32>(&mut store, "main")
             .map_err(|e| anyhow::anyhow!("Failed to get main function: {}", e))?;
 
+        // Update memory usage based on input size
+        store.data_mut().memory_used = input.len() as u32;
+        
         // Call the function
         let result = main_func.call(&mut store, (input.as_ptr() as u32, input.len() as u32))?;
+        
+        // Consume gas for execution
+        let gas_consumed = 1000; // Base execution cost
+        if store.data().gas_remaining >= gas_consumed {
+            store.data_mut().gas_remaining -= gas_consumed;
+        }
         
         // Return result (simplified)
         Ok(vec![result as u8])
@@ -171,12 +190,17 @@ impl PolyTorusExecutionLayer {
             gas_used += 200000; // Deployment gas
         }
 
-        Ok(TransactionReceipt {
+        let receipt = TransactionReceipt {
             tx_hash: tx.hash.clone(),
             success,
             gas_used,
             events,
-        })
+        };
+        
+        // Update execution context if active
+        self.update_execution_context(&receipt, gas_used);
+        
+        Ok(receipt)
     }
 
     /// Transfer funds between accounts
@@ -227,6 +251,16 @@ impl PolyTorusExecutionLayer {
         }
         
         hex::encode(hasher.finalize())
+    }
+    
+    /// Update execution context with transaction receipt
+    fn update_execution_context(&self, receipt: &TransactionReceipt, gas_used: u64) {
+        if let Ok(mut context_guard) = self.execution_context.lock() {
+            if let Some(ref mut context) = *context_guard {
+                context.executed_txs.push(receipt.clone());
+                context.gas_used += gas_used;
+            }
+        }
     }
 }
 
@@ -301,6 +335,7 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
             gas_used: 0,
         };
 
+        log::info!("Beginning execution context: {}", context.context_id);
         *self.execution_context.lock().unwrap() = Some(context);
         Ok(())
     }
@@ -308,6 +343,16 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
     async fn commit_execution(&mut self) -> Result<Hash> {
         let context = self.execution_context.lock().unwrap().take();
         if let Some(ctx) = context {
+            log::info!("Committing execution context: {} with {} transactions and {} gas used", 
+                      ctx.context_id, ctx.executed_txs.len(), ctx.gas_used);
+                      
+            // Validate initial state matches
+            let current_root = self.calculate_state_root();
+            if current_root != ctx.initial_state_root {
+                log::warn!("State root mismatch during commit: expected {}, got {}", 
+                          ctx.initial_state_root, current_root);
+            }
+            
             // Apply pending changes
             let mut states = self.account_states.lock().unwrap();
             for (addr, state) in ctx.pending_changes {

@@ -205,9 +205,18 @@ impl PolyTorusDataAvailabilityLayer {
             .map(|i| format!("peer_{}", i))
             .collect();
         
-        network.data_replicas.insert(hash.clone(), replicas);
+        // Store replicas information  
+        network.data_replicas.insert(hash.clone(), replicas.clone());
         
-        log::info!("Broadcasted data {} to {} replicas", hash, self.config.replication_factor);
+        // Add connected peers if not already present
+        for peer in &replicas {
+            if !network.connected_peers.contains(peer) {
+                network.connected_peers.push(peer.clone());
+            }
+        }
+        
+        log::info!("Broadcasted data {} ({} bytes) to {} replicas", 
+                  hash, data.len(), self.config.replication_factor);
         Ok(())
     }
 
@@ -355,12 +364,17 @@ impl DataAvailabilityLayer for PolyTorusDataAvailabilityLayer {
 
             let proof = AvailabilityProof {
                 data_hash: hash.clone(),
-                merkle_proof,
-                root_hash,
+                merkle_proof: merkle_proof.clone(),
+                root_hash: root_hash.clone(),
                 timestamp: current_time,
             };
 
-            Ok(Some(proof))
+            // Verify the proof before returning it
+            if tree.verify_proof(hash, &merkle_proof, &root_hash) {
+                Ok(Some(proof))
+            } else {
+                Err(anyhow::anyhow!("Generated proof failed verification"))
+            }
         } else {
             Ok(None)
         }

@@ -258,6 +258,15 @@ pub trait ConsensusLayer: Send + Sync {
     
     /// Get validator set
     async fn get_validator_set(&self) -> Result<Vec<ValidatorInfo>>;
+    
+    /// Mine a new block with PoW
+    async fn mine_block(&mut self, transactions: Vec<Transaction>) -> Result<Block>;
+    
+    /// Get current mining difficulty
+    async fn get_difficulty(&self) -> Result<usize>;
+    
+    /// Set mining difficulty
+    async fn set_difficulty(&mut self, difficulty: usize) -> Result<()>;
 }
 
 /// Data Availability Layer Interface - データ保存と配信

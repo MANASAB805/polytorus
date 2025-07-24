@@ -53,7 +53,7 @@ pub struct PolyTorusSettlementLayer {
 
 /// Internal settlement state
 #[derive(Debug, Clone)]
-struct SettlementState {
+pub struct SettlementState {
     settlement_root: Hash,
     settled_batches: HashMap<Hash, SettlementResult>,
     pending_batches: HashMap<Hash, PendingBatch>,
@@ -123,7 +123,7 @@ impl PolyTorusSettlementLayer {
     }
 
     /// Process expired challenges
-    fn process_expired_challenges(&self) -> Result<Vec<ChallengeResult>> {
+    pub fn process_expired_challenges(&self) -> Result<Vec<ChallengeResult>> {
         let mut challenges = self.challenges.lock().unwrap();
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -170,10 +170,10 @@ impl PolyTorusSettlementLayer {
     }
 
     /// Finalize settlements for unchallenged batches
-    fn finalize_unchallenged_batches(&self) -> Result<Vec<SettlementResult>> {
+    pub fn finalize_unchallenged_batches(&self) -> Result<Vec<SettlementResult>> {
         let mut state = self.settlement_state.lock().unwrap();
         let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
+            .duration_since(UNIX_EPOCH)  
             .unwrap()
             .as_secs();
         
@@ -226,7 +226,7 @@ impl PolyTorusSettlementLayer {
     }
 
     /// Calculate current settlement root from all settled batches
-    fn calculate_current_settlement_root(&self, state: &SettlementState) -> Hash {
+    pub fn calculate_current_settlement_root(&self, state: &SettlementState) -> Hash {
         let mut hasher = Sha256::new();
         
         // Sort settled batches for deterministic hash
@@ -257,6 +257,8 @@ impl SettlementLayer for PolyTorusSettlementLayer {
             submitter: "validator_address".to_string(), // Would be actual validator
             challenged: false,
         };
+        
+        log::info!("Settling batch {} submitted by {}", batch.batch_id, pending_batch.submitter);
 
         {
             let mut state = self.settlement_state.lock().unwrap();
@@ -355,7 +357,7 @@ impl SettlementLayer for PolyTorusSettlementLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use traits::{ExecutionResult, TransactionReceipt};
+    use traits::{ExecutionResult};
 
     fn create_test_batch() -> ExecutionBatch {
         ExecutionBatch {

@@ -35,7 +35,7 @@ impl Default for ConsensusConfig {
     fn default() -> Self {
         Self {
             block_time: 10000, // 10 seconds
-            difficulty: 4,
+            difficulty: 4, // Standard Bitcoin-like difficulty
             max_block_size: 1024 * 1024, // 1MB
         }
     }
@@ -129,7 +129,7 @@ impl PolyTorusConsensusLayer {
         }
     }
 
-    /// Calculate block hash
+    /// Calculate block hash including proof (nonce) for PoW
     fn calculate_block_hash(&self, block: &Block) -> Hash {
         let mut hasher = Sha256::new();
         hasher.update(&block.parent_hash);
@@ -138,11 +138,16 @@ impl PolyTorusConsensusLayer {
         hasher.update(&block.state_root);
         hasher.update(&block.transaction_root);
         hasher.update(&block.validator);
+        // Include proof (nonce) in hash calculation for PoW
+        hasher.update(&block.proof);
         hex::encode(hasher.finalize())
     }
 
     /// Validate proof of work
     fn validate_proof_of_work(&self, block: &Block) -> bool {
+        if self.config.difficulty == 0 {
+            return true; // No proof-of-work required
+        }
         let hash = self.calculate_block_hash(block);
         let required_zeros = "0".repeat(self.config.difficulty);
         hash.starts_with(&required_zeros)
@@ -150,22 +155,39 @@ impl PolyTorusConsensusLayer {
 
     /// Mine proof of work
     fn mine_proof_of_work(&self, mut block: Block) -> Result<Block> {
+        // If no difficulty, just set hash and return immediately
+        if self.config.difficulty == 0 {
+            block.proof = vec![0u8; 8]; // Simple proof for no-difficulty
+            block.hash = self.calculate_block_hash(&block);
+            return Ok(block);
+        }
+        
         let mut nonce = 0u64;
+        let required_zeros = "0".repeat(self.config.difficulty);
         
         loop {
             // Add nonce to proof
             block.proof = nonce.to_be_bytes().to_vec();
+            let hash = self.calculate_block_hash(&block);
             
-            if self.validate_proof_of_work(&block) {
-                block.hash = self.calculate_block_hash(&block);
+            if hash.starts_with(&required_zeros) {
+                block.hash = hash;
+                log::info!("Successfully mined block with nonce {} after {} attempts", nonce, nonce + 1);
                 return Ok(block);
             }
             
             nonce += 1;
             
-            // Prevent infinite loop in tests
-            if nonce > 1_000_000 {
-                return Err(anyhow::anyhow!("Failed to mine block after 1M attempts"));
+            // Debug output every 100k attempts
+            if nonce % 100_000 == 0 {
+                log::info!("Mining attempt {}: hash = {}, required = {} zeros", nonce, &hash[0..10.min(hash.len())], self.config.difficulty);
+            }
+            
+            // Prevent infinite loop (increased limit for real PoW)
+            if nonce > 10_000_000 {
+                log::error!("Mining failed after 10M attempts. Difficulty: {}, Last hash: {}", 
+                           self.config.difficulty, &hash[0..10.min(hash.len())]);
+                return Err(anyhow::anyhow!("Failed to mine block after 10M attempts"));
             }
         }
     }
@@ -336,6 +358,54 @@ impl ConsensusLayer for PolyTorusConsensusLayer {
         let validators = self.validators.lock().unwrap();
         Ok(validators.values().cloned().collect())
     }
+
+    async fn mine_block(&mut self, transactions: Vec<Transaction>) -> Result<Block> {
+        let state = self.chain_state.lock().unwrap();
+        let parent_hash = state.canonical_chain.last()
+            .cloned()
+            .unwrap_or_else(|| "genesis_block_hash".to_string());
+        let block_number = state.height + 1;
+        drop(state);
+
+        // Calculate transaction root
+        let mut hasher = Sha256::new();
+        for tx in &transactions {
+            hasher.update(&tx.hash);
+        }
+        let transaction_root = hex::encode(hasher.finalize());
+
+        // Create block template
+        let mut block = Block {
+            hash: String::new(), // Will be set during mining
+            parent_hash,
+            number: block_number,
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            transactions,
+            state_root: "pending_state_root".to_string(), // Would be calculated from execution
+            transaction_root,
+            validator: self.validator_address.clone().unwrap_or_else(|| "miner".to_string()),
+            proof: vec![], // Will be set during mining
+        };
+
+        // Mine the block using PoW
+        block = self.mine_proof_of_work(block)?;
+        
+        log::info!("Successfully mined block #{} with hash: {}", block.number, block.hash);
+        Ok(block)
+    }
+
+    async fn get_difficulty(&self) -> Result<usize> {
+        Ok(self.config.difficulty)
+    }
+
+    async fn set_difficulty(&mut self, difficulty: usize) -> Result<()> {
+        log::info!("Updating difficulty from {} to {}", self.config.difficulty, difficulty);
+        self.config.difficulty = difficulty;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -364,11 +434,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_block_validation() {
-        let config = ConsensusConfig::default();
+        let config = ConsensusConfig {
+            difficulty: 2, // Require difficulty for this test
+            ..ConsensusConfig::default()
+        };
         let layer = PolyTorusConsensusLayer::new(config).unwrap();
         
         let genesis_hash = layer.get_canonical_chain().await.unwrap()[0].clone();
-        let mut block = Block {
+        let block = Block {
             hash: "test_block".to_string(),
             parent_hash: genesis_hash,
             number: 1,
@@ -456,5 +529,55 @@ mod tests {
         assert_eq!(block.number, 1);
         assert_eq!(block.transactions.len(), 1);
         assert!(!block.hash.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_pow_mining() {
+        let config = ConsensusConfig {
+            difficulty: 1, // Easy difficulty for tests
+            ..ConsensusConfig::default()
+        };
+        let mut layer = PolyTorusConsensusLayer::new_as_validator(
+            config, 
+            "miner_1".to_string()
+        ).unwrap();
+        
+        let transaction = Transaction {
+            hash: "test_tx".to_string(),
+            from: "alice".to_string(),
+            to: Some("bob".to_string()),
+            value: 100,
+            gas_limit: 21000,
+            gas_price: 1,
+            data: vec![],
+            nonce: 0,
+            signature: vec![],
+        };
+        
+        let block = layer.mine_block(vec![transaction]).await.unwrap();
+        
+        // Verify the block was mined correctly
+        assert!(!block.hash.is_empty());
+        assert_eq!(block.number, 1);
+        assert_eq!(block.transactions.len(), 1);
+        assert!(!block.proof.is_empty());
+        
+        // Verify PoW validation
+        assert!(layer.validate_proof_of_work(&block));
+    }
+    
+    #[tokio::test]
+    async fn test_difficulty_adjustment() {
+        let config = ConsensusConfig::default();
+        let mut layer = PolyTorusConsensusLayer::new(config).unwrap();
+        
+        // Get initial difficulty
+        let initial_difficulty = layer.get_difficulty().await.unwrap();
+        assert_eq!(initial_difficulty, 4);
+        
+        // Adjust difficulty
+        layer.set_difficulty(2).await.unwrap();
+        let new_difficulty = layer.get_difficulty().await.unwrap();
+        assert_eq!(new_difficulty, 2);
     }
 }

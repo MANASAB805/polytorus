@@ -45,6 +45,11 @@ clap = "4.0"
 rand = "0.8.5"
 
 
+# Library configuration
+[lib]
+name = "polytorus"
+path = "src/lib.rs"
+
 # Main binary configuration
 [[bin]]
 name = "polytorus"
