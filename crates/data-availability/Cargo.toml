@@ -1,0 +1,29 @@
+[package]
+name = "data-availability"
+version = "0.1.0"
+edition = "2021"
+description = "Data Availability Layer - Data storage and distribution" 
+authors = ["quantumshiro"]
+license = "MIT"
+
+[dependencies]
+traits = { path = "../traits" }
+
+# Core dependencies
+anyhow = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+# Cryptography and merkle trees
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# Storage
+sled = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+uuid = { workspace = true }
