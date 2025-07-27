@@ -93,6 +93,14 @@ The project is organized as a Rust workspace with separate crates for each layer
    - Shared data structures (Transaction, Block, Hash, etc.)
    - Result types and error handling
 
+6. **External Wallet** - Cryptographic wallet functionality
+   - **Repository**: https://github.com/PolyTorus/wallet
+   - HD wallet implementation with BIP32/BIP44 support
+   - Address generation and key pair management
+   - Digital signature creation and verification
+   - Multi-signature wallet capabilities
+   - **Integration**: Available as `wallet` crate dependency
+
 ### Main Orchestrator (`src/main.rs`)
 The `PolyTorusBlockchain` struct coordinates all layers:
 - Manages layer lifecycle (initialization, coordination)
@@ -150,6 +158,40 @@ Each layer follows a consistent pattern:
 3. Add comprehensive tests
 4. Update the main orchestrator if needed
 5. Update configuration if new settings are required
+
+#### Integrating Wallet Functionality
+The external wallet crate provides comprehensive cryptographic capabilities:
+
+```rust
+// Import wallet functionality
+use wallet::{
+    HDWallet, Wallet, Address, KeyPair, Signature, 
+    AddressFormat, WalletError
+};
+
+// Create a new HD wallet
+let mnemonic = HDWallet::generate_mnemonic()?;
+let wallet = HDWallet::from_mnemonic(&mnemonic, None)?;
+
+// Generate addresses
+let address = wallet.derive_address(0, false)?; // First receiving address
+let change_address = wallet.derive_address(0, true)?; // First change address
+
+// Create key pairs for signing
+let keypair = wallet.derive_keypair(0, false)?;
+let signature = keypair.sign(message_hash)?;
+
+// Verify signatures
+let is_valid = keypair.verify(message_hash, &signature)?;
+```
+
+**Wallet Features:**
+- **HD Wallet**: BIP32/BIP44 hierarchical deterministic wallet support
+- **Address Generation**: Multiple address formats (Legacy, SegWit, Native SegWit)
+- **Key Management**: Secure key pair generation and management
+- **Digital Signatures**: ECDSA signature creation and verification
+- **Multi-signature**: Multi-signature wallet creation and transaction signing
+- **Mnemonic**: BIP39 mnemonic phrase generation and recovery
 
 #### Debugging Layer Interactions
 The orchestrator processes transactions through layers in this order:

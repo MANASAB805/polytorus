@@ -17,7 +17,6 @@ members = [
     "crates/settlement",
     "crates/consensus",
     "crates/data-availability", 
-    "crates/wallet",
     "crates/p2p-network",
 ]
 
@@ -70,6 +69,9 @@ settlement = { path = "crates/settlement" }
 consensus = { path = "crates/consensus" }
 data-availability = { path = "crates/data-availability" }
 p2p-network = { path = "crates/p2p-network" }
+
+# External wallet dependency
+wallet = { git = "https://github.com/PolyTorus/wallet.git" }
 
 # Core dependencies
 anyhow = { workspace = true }
