@@ -16,7 +16,9 @@ members = [
     "crates/execution", 
     "crates/settlement",
     "crates/consensus",
-    "crates/data-availability", "crates/wallet",
+    "crates/data-availability", 
+    "crates/wallet",
+    "crates/p2p-network",
 ]
 
 resolver = "2"
@@ -33,12 +35,17 @@ async-trait = "0.1"
 log = "0.4"
 env_logger = "0.11"
 
+# WebRTC P2P networking
+webrtc = "0.11"
+bytes = "1.5"
+
 # Only essential dependencies for modular layers
 sha2 = "0.10"
 hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.16.0", features = ["v4", "serde"] }
 sled = "0.34"
+bincode = "1.3"
 wasmtime = "33.0.0"
 wat = "1.0"
 clap = "4.0"
@@ -50,6 +57,11 @@ rand = "0.8.5"
 name = "polytorus"
 path = "src/lib.rs"
 
+# Binary configuration
+[[bin]]
+name = "polytorus"
+path = "src/main.rs"
+
 [dependencies]
 # Layer crates
 traits = { path = "crates/traits" }
@@ -57,9 +69,13 @@ execution = { path = "crates/execution" }
 settlement = { path = "crates/settlement" }
 consensus = { path = "crates/consensus" }
 data-availability = { path = "crates/data-availability" }
+p2p-network = { path = "crates/p2p-network" }
 
 # Core dependencies
 anyhow = { workspace = true }
+
+# Force compatible versions for Docker build
+base64ct = "=1.6.0"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 async-trait = { workspace = true }
 serde = { workspace = true }

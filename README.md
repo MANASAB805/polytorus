@@ -589,4 +589,265 @@ make security        # All security checks
 make docs            # Generate documentation
 ```
 
+## 🧪 Container Lab E2E Testing Environment
+
+PolyTorus provides a complete **Container Lab environment** for realistic multi-node testing with real WebRTC P2P networking and transaction propagation testing.
+
+### 🚀 Quick Start with Container Lab
+
+#### Prerequisites
+- **Docker**: Container runtime
+- **Container Lab**: Network simulation tool (optional, manual Docker approach available)
+- **Rust 1.84+**: For WASM and WebRTC support
+
+#### 1. Build Testnet Docker Image
+```bash
+# Build optimized Docker image with Rust 1.84 and WASM support
+docker build -f Dockerfile.testnet -t polytorus:testnet .
+```
+
+#### 2. Deploy 3-Node Testnet
+```bash
+# Create Docker network
+docker network create polytorus-net
+
+# Start Bootstrap Node (Entry point)
+docker run -d --name polytorus-bootstrap \
+  --network polytorus-net -p 18080:8080 \
+  -e NODE_ID=bootstrap-node \
+  -e LISTEN_PORT=8080 \
+  -e RUST_LOG=info \
+  polytorus:testnet
+
+# Start Validator Node 1
+docker run -d --name polytorus-validator1 \
+  --network polytorus-net -p 18081:8080 \
+  -e NODE_ID=validator-1 \
+  -e LISTEN_PORT=8080 \
+  -e BOOTSTRAP_PEERS=polytorus-bootstrap:8080 \
+  -e RUST_LOG=info \
+  polytorus:testnet
+
+# Start Validator Node 2  
+docker run -d --name polytorus-validator2 \
+  --network polytorus-net -p 18082:8080 \
+  -e NODE_ID=validator-2 \
+  -e LISTEN_PORT=8080 \
+  -e BOOTSTRAP_PEERS=polytorus-bootstrap:8080,polytorus-validator1:8080 \
+  -e RUST_LOG=info \
+  polytorus:testnet
+```
+
+#### 3. Verify Network Deployment
+```bash
+# Check running containers
+docker ps --filter "name=polytorus-"
+
+# Test network connectivity
+docker exec polytorus-validator1 ping -c 3 polytorus-bootstrap
+
+# Check node logs
+docker logs polytorus-bootstrap --tail 20
+```
+
+### 🎯 Manual Testing Commands
+
+#### Initialize Blockchain
+```bash
+# Initialize blockchain on bootstrap node
+docker exec polytorus-bootstrap polytorus start
+
+# Check blockchain status
+docker exec polytorus-bootstrap polytorus status
+```
+
+#### Send Transactions
+```bash
+# Send test transaction
+docker exec polytorus-bootstrap polytorus send \
+  --from alice --to bob --amount 1000
+
+# Send from validator node
+docker exec polytorus-validator1 polytorus send \
+  --from validator1 --to alice --amount 500
+```
+
+#### Test P2P Networking
+```bash
+# Start P2P networking on bootstrap node
+docker exec -d polytorus-bootstrap polytorus start-p2p \
+  --node-id bootstrap-node --listen-port 8080
+
+# Start P2P on validator with bootstrap peer
+docker exec -d polytorus-validator1 polytorus start-p2p \
+  --node-id validator-1 --listen-port 8080 \
+  --bootstrap-peers polytorus-bootstrap:8080
+```
+
+#### Interactive Node Access
+```bash
+# Access bootstrap node shell
+docker exec -it polytorus-bootstrap bash
+
+# Access validator node shell
+docker exec -it polytorus-validator1 bash
+
+# Inside container - run commands directly
+polytorus status
+polytorus send --from alice --to bob --amount 1000
+```
+
+### 🔧 Automated Testing Scripts
+
+#### Helper Scripts
+```bash
+# Manual testing helper
+./scripts/manual-test.sh start          # Build and start testnet
+./scripts/manual-test.sh status         # Show network status  
+./scripts/manual-test.sh test-tx        # Send test transaction
+./scripts/manual-test.sh logs bootstrap # Show node logs
+./scripts/manual-test.sh exec bootstrap # Access node shell
+./scripts/manual-test.sh stop           # Stop and cleanup
+
+# E2E test suite (requires Container Lab)
+./scripts/run-e2e-tests.sh
+```
+
+### 🌐 Network Configuration
+
+#### Node Configuration
+| Node | Container Name | Host Port | Node ID | Role | Bootstrap Peers |
+|------|----------------|-----------|---------|------|-----------------|
+| Bootstrap | polytorus-bootstrap | 18080 | bootstrap-node | Entry Point | - |
+| Validator 1 | polytorus-validator1 | 18081 | validator-1 | Validator | bootstrap:8080 |
+| Validator 2 | polytorus-validator2 | 18082 | validator-2 | Validator | bootstrap:8080,validator1:8080 |
+
+#### Environment Variables
+```bash
+NODE_ID=<unique-node-identifier>     # Node identification
+LISTEN_PORT=8080                     # P2P listening port
+BOOTSTRAP_PEERS=<comma-separated>    # List of bootstrap peers
+RUST_LOG=info                        # Logging level
+DEBUG_MODE=true                      # Enable debug mode
+```
+
+### 📊 Network Testing & Monitoring
+
+#### Connection Testing
+```bash
+# Test inter-node connectivity
+docker exec polytorus-validator1 ping polytorus-bootstrap
+docker exec polytorus-validator2 ping polytorus-validator1
+
+# Check P2P port connectivity
+docker exec polytorus-bootstrap netstat -tlnp | grep 8080
+```
+
+#### Transaction Flow Testing
+```bash
+# Multi-node transaction propagation test
+for node in bootstrap validator1 validator2; do
+  echo "Testing $node..."
+  docker exec polytorus-$node polytorus send \
+    --from $node --to other --amount 100
+done
+```
+
+#### Performance Monitoring
+```bash
+# Container resource usage
+docker stats polytorus-bootstrap polytorus-validator1 polytorus-validator2
+
+# Network traffic monitoring
+docker exec polytorus-bootstrap netstat -i
+```
+
+### 🔄 Container Lab Integration (Optional)
+
+For users with Container Lab access:
+
+#### Container Lab Topology
+```yaml
+# testnet.yml - Full Container Lab topology
+name: polytorus-testnet
+topology:
+  nodes:
+    bootstrap:
+      kind: linux
+      image: polytorus:testnet
+      env:
+        NODE_ID: "bootstrap-node"
+        LISTEN_PORT: "8080"
+    validator1:
+      kind: linux
+      image: polytorus:testnet
+      env:
+        NODE_ID: "validator-1"
+        BOOTSTRAP_PEERS: "bootstrap:8080"
+  links:
+    - endpoints: ["bootstrap:eth0", "validator1:eth0"]
+```
+
+#### Deploy with Container Lab
+```bash
+# Deploy complete topology
+sudo containerlab deploy -t testnet.yml
+
+# Access nodes
+sudo containerlab exec -t testnet.yml bootstrap bash
+
+# Cleanup
+sudo containerlab destroy -t testnet.yml
+```
+
+### 🧪 Test Results & Validation
+
+The Container Lab environment provides:
+
+✅ **Network Foundation**
+- 3-node testnet with proper inter-node communication
+- WebRTC P2P networking with real data channels
+- Environment-based configuration system
+
+✅ **Blockchain Operations**
+- Node initialization and blockchain startup
+- Transaction creation and propagation
+- Multi-node coordination
+
+✅ **Production Readiness**
+- Containerized deployment
+- Resource monitoring and health checks
+- Scalable architecture for additional nodes
+
+### 🔍 Troubleshooting
+
+#### Common Issues
+```bash
+# Container startup issues
+docker logs polytorus-bootstrap
+
+# Network connectivity problems
+docker network inspect polytorus-net
+
+# Port conflicts
+docker port polytorus-bootstrap
+
+# Resource issues
+docker system df
+docker system prune
+```
+
+#### Debug Mode
+```bash
+# Start containers with debug mode
+docker run -d --name polytorus-debug \
+  --network polytorus-net \
+  -e NODE_ID=debug-node \
+  -e DEBUG_MODE=true \
+  -e RUST_LOG=debug \
+  polytorus:testnet
+```
+
+For detailed testing procedures and results, see [E2E Test Report](e2e-test-report.md).
+
 ## 🔧 OpenFHE Library Installation

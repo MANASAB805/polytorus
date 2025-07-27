@@ -525,6 +525,7 @@ mod tests {
                 data: vec![],
                 nonce: 0,
                 signature: vec![],
+                script_type: None,
             }
         ];
         
@@ -555,6 +556,7 @@ mod tests {
             data: vec![],
             nonce: 0,
             signature: vec![],
+            script_type: None,
         };
         
         let block = layer.mine_block(vec![transaction]).await.unwrap();

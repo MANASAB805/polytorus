@@ -34,6 +34,28 @@ pub struct Transaction {
     pub data: Vec<u8>,
     pub nonce: u64,
     pub signature: Vec<u8>,
+    pub script_type: Option<ScriptTransactionType>,
+}
+
+/// Script transaction type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ScriptTransactionType {
+    /// Deploy a new script
+    Deploy {
+        script_data: Vec<u8>,
+        init_params: Vec<u8>,
+    },
+    /// Call an existing script
+    Call {
+        script_hash: Hash,
+        method: String,
+        params: Vec<u8>,
+    },
+    /// Update script state
+    StateUpdate {
+        script_hash: Hash,
+        updates: Vec<(Vec<u8>, Vec<u8>)>,
+    },
 }
 
 /// Block structure
@@ -328,6 +350,15 @@ pub trait ExecutionLayer: Send + Sync {
     
     /// Rollback execution
     async fn rollback_execution(&mut self) -> Result<()>;
+    
+    /// Deploy a script
+    async fn deploy_script(&mut self, owner: &Address, script_data: &[u8], init_params: &[u8]) -> Result<Hash>;
+    
+    /// Execute a script
+    async fn execute_script(&mut self, script_hash: &Hash, method: &str, params: &[u8], context: ScriptExecutionContext) -> Result<ScriptExecutionResult>;
+    
+    /// Get script metadata
+    async fn get_script_metadata(&self, script_hash: &Hash) -> Result<Option<ScriptMetadata>>;
 }
 
 /// eUTXO Execution Layer Interface
@@ -362,6 +393,39 @@ pub trait UtxoExecutionLayer: Send + Sync {
     
     /// Get total value in UTXO set
     async fn get_total_supply(&self) -> Result<u64>;
+}
+
+/// Script execution context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptExecutionContext {
+    pub tx_hash: Hash,
+    pub sender: Address,
+    pub value: u64,
+    pub gas_limit: u64,
+    pub block_height: u64,
+    pub timestamp: u64,
+}
+
+/// Script execution result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptExecutionResult {
+    pub success: bool,
+    pub gas_used: u64,
+    pub return_data: Vec<u8>,
+    pub logs: Vec<String>,
+    pub state_changes: Vec<(Vec<u8>, Vec<u8>)>,
+    pub events: Vec<Event>,
+}
+
+/// Script metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptMetadata {
+    pub script_hash: Hash,
+    pub owner: Address,
+    pub deployed_at: u64,
+    pub code_size: usize,
+    pub version: u32,
+    pub active: bool,
 }
 
 /// Settlement Layer Interface - 紛争解決と最終確定
@@ -486,4 +550,35 @@ pub trait DataAvailabilityLayer: Send + Sync {
     
     /// Get data entry metadata
     async fn get_data_entry(&self, hash: &Hash) -> Result<Option<DataEntry>>;
+}
+
+/// P2P Network Layer Interface - WebRTC peer-to-peer networking
+#[async_trait::async_trait]
+pub trait P2PNetworkLayer: Send + Sync {
+    /// Start the P2P network
+    async fn start(&self) -> Result<()>;
+    
+    /// Connect to a specific peer
+    async fn connect_to_peer(&self, peer_id: String, peer_address: String) -> Result<()>;
+    
+    /// Send transaction to the network
+    async fn broadcast_transaction(&self, tx: &UtxoTransaction) -> Result<()>;
+    
+    /// Send block to the network
+    async fn broadcast_block(&self, block: &UtxoBlock) -> Result<()>;
+    
+    /// Request data from peers
+    async fn request_blockchain_data(&self, data_type: String, data_hash: Hash) -> Result<()>;
+    
+    /// Get list of connected peers
+    async fn get_connected_peers(&self) -> Vec<String>;
+    
+    /// Get peer information
+    async fn get_peer_info(&self, peer_id: &str) -> Result<Option<String>>;
+    
+    /// Disconnect from a specific peer
+    async fn disconnect_peer(&self, peer_id: &str) -> Result<()>;
+    
+    /// Shutdown the P2P network
+    async fn shutdown(&self) -> Result<()>;
 }

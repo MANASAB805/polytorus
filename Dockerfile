@@ -73,10 +73,12 @@ RUN ldconfig
 # Install Rust nightly
 RUN apt-get update && apt-get install -y curl && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2025-01-15 && \
-    rustup component add clippy && \
     rm -rf /var/lib/apt/lists/*
 
+# Set PATH and install clippy
 ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup component add clippy
+
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
 ENV OPENFHE_ROOT="/usr/local"
@@ -88,29 +90,24 @@ WORKDIR /app
 
 # Copy dependency files
 COPY Cargo.toml Cargo.lock ./
-COPY build.rs ./
+COPY crates/ ./crates/
 
 # Create dummy source to cache dependencies
-RUN mkdir src benches && \
+RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \
-    echo 'pub fn add(left: usize, right: usize) -> usize { left + right }' > src/lib.rs && \
-    echo 'fn main() {}' > benches/blockchain_bench.rs && \
-    echo 'fn main() {}' > benches/quick_tps_bench.rs
+    echo 'pub fn add(left: usize, right: usize) -> usize { left + right }' > src/lib.rs
 
 # Build dependencies (cached layer)
 RUN cargo build --release --bins && \
-    rm -rf src benches
+    rm -rf src
 
 # Copy source code
 COPY src/ ./src/
 COPY examples/ ./examples/
-COPY tests/ ./tests/
-COPY benches/ ./benches/
 COPY config/ ./config/
-COPY contracts/ ./contracts/
 
 # Verify source files are copied correctly
-RUN ls -la src/ && ls -la src/command/ && ls -la src/diamond_io_integration.rs
+RUN ls -la src/
 
 # Run clippy checks before building
 RUN echo "Running clippy checks..." && \

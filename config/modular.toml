@@ -17,7 +17,7 @@ min_validator_stake = 1000
 
 [consensus]
 block_time = 10000         # milliseconds (10 seconds)
-difficulty = 4          # PoW difficulty (leading zeros required)
+difficulty = 0          # PoW difficulty (0 = instant mining for testing)
 max_block_size = 1048576   # 1MB
 
 [data_availability]

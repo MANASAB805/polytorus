@@ -18,7 +18,8 @@
 //!
 //! ## Example Usage
 //! ```rust
-//! use polytorus_data_availability::*;
+//! use data_availability::*;
+//! use traits::DataAvailabilityLayer;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Configure the data availability layer

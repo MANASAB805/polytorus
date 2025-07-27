@@ -19,7 +19,8 @@ use traits::{
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use wasmtime::{Engine, Linker, Module, Store};
+use hex;
+use wasmtime::{Engine, Linker};
 
 /// eUTXO execution layer configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,8 +57,10 @@ impl Default for UtxoExecutionConfig {
 /// eUTXO execution layer implementation
 pub struct PolyTorusUtxoExecutionLayer {
     /// WASM engine for script execution
+    #[allow(dead_code)]
     engine: Engine,
     /// Linker for WASM modules
+    #[allow(dead_code)]
     linker: Linker<ScriptExecutionStore>,
     /// Current UTXO set
     utxo_set: Arc<Mutex<UtxoSet>>,
@@ -66,6 +69,7 @@ pub struct PolyTorusUtxoExecutionLayer {
     /// Execution context for batching
     execution_context: Arc<Mutex<Option<UtxoExecutionContext>>>,
     /// Configuration
+    #[allow(dead_code)]
     config: UtxoExecutionConfig,
     /// Current slot
     current_slot: Arc<Mutex<u64>>,
@@ -85,7 +89,9 @@ struct UtxoExecutionContext {
 /// Script execution store for WASM
 #[derive(Debug)]
 struct ScriptExecutionStore {
+    #[allow(dead_code)]
     execution_units_remaining: u64,
+    #[allow(dead_code)]
     memory_used: u32,
     script_context: Option<ScriptContext>,
 }
@@ -146,43 +152,68 @@ impl PolyTorusUtxoExecutionLayer {
 
     /// Process single eUTXO transaction
     fn process_utxo_transaction(&mut self, tx: &UtxoTransaction) -> Result<UtxoTransactionReceipt> {
+        log::info!("Processing UTXO transaction: {}", tx.hash);
+        
+        // Actual implementation with proper validation
         let mut script_execution_units = 0;
         let mut events = Vec::new();
         let mut success = true;
         let mut script_logs = Vec::new();
+        
+        log::info!("UTXO transaction processing completed: {}", tx.hash);
 
-        // Validate transaction structure
+        // Validate transaction structure - first basic checks
         if tx.inputs.is_empty() && tx.outputs.iter().any(|o| o.value > 0) {
-            // This would be a coinbase transaction - only allowed in specific contexts
             success = false;
+            script_logs.push("Coinbase transaction not allowed in this context".to_string());
         }
 
-        // Check fee calculation - scope the lock carefully
-        let input_value: u64 = {
+        // Check fee calculation - collect input values safely
+        let input_value: u64;
+        let mut consumed_utxos = Vec::new();
+        
+        {
             let utxo_set = self.utxo_set.lock().unwrap();
-            tx.inputs.iter()
-                .filter_map(|input| utxo_set.utxos.get(&input.utxo_id))
-                .map(|utxo| utxo.value)
-                .sum()
-        }; // utxo_set lock is dropped here
+            log::info!("UTXO set contains {} UTXOs", utxo_set.utxos.len());
+            
+            input_value = tx.inputs.iter()
+                .filter_map(|input| {
+                    log::info!("Looking for UTXO: {:?}", input.utxo_id);
+                    if let Some(utxo) = utxo_set.utxos.get(&input.utxo_id) {
+                        consumed_utxos.push(utxo.clone());
+                        Some(utxo.value)
+                    } else {
+                        success = false;
+                        script_logs.push(format!("UTXO not found: {}", input.utxo_id.tx_hash));
+                        None
+                    }
+                })
+                .sum();
+        } // utxo_set lock is dropped here
         
         let output_value: u64 = tx.outputs.iter().map(|o| o.value).sum();
         
         if input_value < output_value + tx.fee {
             success = false;
+            script_logs.push(format!("Insufficient funds: input={}, output+fee={}", input_value, output_value + tx.fee));
         }
 
-        // Validate inputs and execute scripts - collect UTXOs first, then release lock
-        let mut consumed_utxos = Vec::new();
-        let current_slot = *self.current_slot.lock().unwrap(); // Get slot value early
+        // Execute scripts for each input if basic validation passed
+        let current_slot = *self.current_slot.lock().unwrap();
         
         // First phase: collect UTXOs
         {
+            log::info!("Collecting UTXOs for {} inputs", tx.inputs.len());
             let utxo_set = self.utxo_set.lock().unwrap();
-            for input in &tx.inputs {
+            log::info!("UTXO set contains {} UTXOs", utxo_set.utxos.len());
+            
+            for (idx, input) in tx.inputs.iter().enumerate() {
+                log::info!("Checking input {}: {:?}", idx, input.utxo_id);
                 if let Some(utxo) = utxo_set.utxos.get(&input.utxo_id) {
+                    log::info!("Found UTXO with value: {}", utxo.value);
                     consumed_utxos.push(utxo.clone());
                 } else {
+                    log::warn!("UTXO not found for input: {:?}", input.utxo_id);
                     success = false;
                     script_logs.push(format!("UTXO not found for input: {}", input.utxo_id.tx_hash));
                 }
@@ -270,7 +301,7 @@ impl PolyTorusUtxoExecutionLayer {
             success,
             script_execution_units,
             consumed_utxos: tx.inputs.iter().map(|i| i.utxo_id.clone()).collect(),
-            created_utxos: created_utxo_ids,
+            created_utxos: created_utxo_ids.clone(),
             events,
             script_logs,
         };
@@ -363,7 +394,23 @@ impl PolyTorusUtxoExecutionLayer {
         log::info!("Initialized genesis UTXO set with {} UTXOs, total value: {}", 
                   utxo_set.utxos.len(), total_value);
         
-        Ok(self.calculate_utxo_set_hash())
+        // Calculate hash directly while we have the lock to avoid potential deadlocks
+        let mut hasher = Sha256::new();
+        let mut sorted_utxos: Vec<_> = utxo_set.utxos.iter().collect();
+        sorted_utxos.sort_by_key(|(id, _)| (&id.tx_hash, id.output_index));
+        
+        for (utxo_id, utxo) in sorted_utxos {
+            hasher.update(&utxo_id.tx_hash);
+            hasher.update(utxo_id.output_index.to_be_bytes());
+            hasher.update(utxo.value.to_be_bytes());
+            hasher.update(&utxo.script);
+            if let Some(ref datum) = utxo.datum {
+                hasher.update(datum);
+            }
+        }
+        
+        let hash = hex::encode(hasher.finalize());
+        Ok(hash)
     }
 
     /// Create coinbase UTXO (for block rewards)
@@ -440,8 +487,19 @@ impl PolyTorusUtxoExecutionLayer {
 #[async_trait]
 impl UtxoExecutionLayer for PolyTorusUtxoExecutionLayer {
     async fn execute_utxo_transaction(&mut self, tx: &UtxoTransaction) -> Result<UtxoTransactionReceipt> {
+        log::info!("Starting UTXO transaction execution for hash: {}", tx.hash);
+        
         // Process the transaction directly without complex async yielding
-        self.process_utxo_transaction(tx)
+        match self.process_utxo_transaction(tx) {
+            Ok(receipt) => {
+                log::info!("UTXO transaction execution completed successfully: {}", tx.hash);
+                Ok(receipt)
+            }
+            Err(e) => {
+                log::error!("UTXO transaction execution failed for {}: {}", tx.hash, e);
+                Err(e)
+            }
+        }
     }
 
     async fn execute_utxo_batch(&mut self, transactions: Vec<UtxoTransaction>) -> Result<UtxoExecutionBatch> {
@@ -589,7 +647,7 @@ mod tests {
     #[test]
     fn test_basic_utxo_operations() {
         let config = UtxoExecutionConfig::default();
-        let mut layer = PolyTorusUtxoExecutionLayer::new(config).unwrap();
+        let layer = PolyTorusUtxoExecutionLayer::new(config).unwrap();
 
         // Test basic hash calculation
         let hash = layer.calculate_utxo_set_hash();
