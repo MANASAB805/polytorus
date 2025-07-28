@@ -121,10 +121,35 @@ impl PolyTorusUtxoExecutionLayer {
             0
         })?;
 
-        linker.func_wrap("env", "validate_signature", |_caller: wasmtime::Caller<'_, ScriptExecutionStore>, 
-                         _pub_key: u32, _signature: u32, _message: u32| -> i32 {
-            // Simplified signature validation
-            1 // Always valid for now
+        linker.func_wrap("env", "validate_signature", |mut caller: wasmtime::Caller<'_, ScriptExecutionStore>, 
+                         _pub_key_ptr: u32, signature_ptr: u32, message_ptr: u32| -> i32 {
+            // Extract memory from caller
+            let memory = match caller.get_export("memory") {
+                Some(wasmtime::Extern::Memory(mem)) => mem,
+                _ => return 0, // No memory export found
+            };
+
+            let data = memory.data(&caller);
+            
+            // Basic length checks - real crypto signatures are typically 64-65 bytes
+            let signature_start = signature_ptr as usize;
+            let message_start = message_ptr as usize;
+            
+            // Check bounds and minimum signature length
+            if signature_start + 32 > data.len() || message_start + 32 > data.len() {
+                return 0; // Invalid memory access
+            }
+            
+            // Extract signature length from first few bytes or use fixed length
+            let signature_data = &data[signature_start..signature_start + 64.min(data.len() - signature_start)];
+            
+            // Real signature verification would happen here
+            // For now, we validate that we have a reasonable signature length
+            if signature_data.len() >= 32 && signature_data.iter().any(|&b| b != 0) {
+                1 // Valid signature format
+            } else {
+                0 // Invalid signature
+            }
         })?;
 
         let initial_utxo_set = UtxoSet {
