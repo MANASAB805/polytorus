@@ -7,11 +7,11 @@
 //! - Block mining and consensus
 //! - Rollup batch processing
 
-use execution::execution_engine::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
 use consensus::consensus_engine::{PolyTorusUtxoConsensusLayer, UtxoConsensusConfig};
+use execution::execution_engine::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
 use traits::{
-    UtxoExecutionLayer, UtxoConsensusLayer, UtxoTransaction, UtxoId,
-    TxInput, TxOutput, ScriptContext
+    ScriptContext, TxInput, TxOutput, UtxoConsensusLayer, UtxoExecutionLayer, UtxoId,
+    UtxoTransaction,
 };
 
 /// Demonstration of eUTXO functionality
@@ -29,7 +29,7 @@ impl UtxoDemo {
         let execution_layer = PolyTorusUtxoExecutionLayer::new(execution_config)?;
         let consensus_layer = PolyTorusUtxoConsensusLayer::new_as_validator(
             consensus_config,
-            "demo_validator".to_string()
+            "demo_validator".to_string(),
         )?;
 
         Ok(Self {
@@ -49,13 +49,14 @@ impl UtxoDemo {
         let genesis_utxo = traits::Utxo {
             id: genesis_utxo_id.clone(),
             value: 1_000_000, // 1M units
-            script: vec![], // Empty script = "always true"
+            script: vec![],   // Empty script = "always true"
             datum: Some(b"Genesis UTXO".to_vec()),
             datum_hash: Some("genesis_datum_hash".to_string()),
         };
 
         // Initialize genesis UTXO set properly
-        self.execution_layer.initialize_genesis_utxo_set(vec![(genesis_utxo_id.clone(), genesis_utxo)])?;
+        self.execution_layer
+            .initialize_genesis_utxo_set(vec![(genesis_utxo_id.clone(), genesis_utxo)])?;
 
         println!("Created genesis UTXO: {genesis_utxo_id:?}");
         Ok(genesis_utxo_id)
@@ -81,7 +82,7 @@ impl UtxoDemo {
             outputs: vec![
                 TxOutput {
                     value: to_value,
-                    script: vec![], // Empty script = "always true" 
+                    script: vec![], // Empty script = "always true"
                     datum: Some(b"Transferred value".to_vec()),
                     datum_hash: Some("transfer_datum_hash".to_string()),
                 },
@@ -149,11 +150,18 @@ impl UtxoDemo {
 
         // Step 3: Execute the transaction
         println!("\n⚡ Executing Transaction...");
-        match self.execution_layer.execute_utxo_transaction(&transfer_tx).await {
+        match self
+            .execution_layer
+            .execute_utxo_transaction(&transfer_tx)
+            .await
+        {
             Ok(receipt) => {
                 println!("✅ Transaction executed successfully!");
                 println!("   - Success: {}", receipt.success);
-                println!("   - Script execution units: {}", receipt.script_execution_units);
+                println!(
+                    "   - Script execution units: {}",
+                    receipt.script_execution_units
+                );
                 println!("   - Consumed UTXOs: {}", receipt.consumed_utxos.len());
                 println!("   - Created UTXOs: {}", receipt.created_utxos.len());
                 println!("   - Events: {}", receipt.events.len());
@@ -172,7 +180,10 @@ impl UtxoDemo {
 
         // Step 5: Create and mine a block
         println!("\n⛏️ Mining Block with Transaction...");
-        let block = self.consensus_layer.mine_utxo_block(vec![transfer_tx]).await?;
+        let block = self
+            .consensus_layer
+            .mine_utxo_block(vec![transfer_tx])
+            .await?;
         println!("✅ Block mined successfully!");
         println!("   - Block #{} (Slot {})", block.number, block.slot);
         println!("   - Hash: {}", block.hash);
@@ -184,7 +195,7 @@ impl UtxoDemo {
         println!("   - Block slot: {}", block.slot);
         println!("   - Parent hash: {}", block.parent_hash);
         println!("   - Transactions: {}", block.transactions.len());
-        
+
         let is_valid = self.consensus_layer.validate_utxo_block(&block).await?;
         if is_valid {
             self.consensus_layer.add_utxo_block(block).await?;
@@ -207,12 +218,22 @@ impl UtxoDemo {
         println!("\n📦 Creating Transaction Batch...");
         let batch_txs = vec![
             self.create_transfer_transaction(
-                UtxoId { tx_hash: "batch_tx_1".to_string(), output_index: 0 },
-                100_000, 580_000, 20_000
+                UtxoId {
+                    tx_hash: "batch_tx_1".to_string(),
+                    output_index: 0,
+                },
+                100_000,
+                580_000,
+                20_000,
             ),
             self.create_transfer_transaction(
-                UtxoId { tx_hash: "batch_tx_2".to_string(), output_index: 0 },
-                150_000, 430_000, 20_000
+                UtxoId {
+                    tx_hash: "batch_tx_2".to_string(),
+                    output_index: 0,
+                },
+                150_000,
+                430_000,
+                20_000,
             ),
         ];
 
@@ -261,26 +282,36 @@ impl UtxoDemo {
         // Test 1: Empty script (should always succeed)
         let empty_script = vec![];
         let empty_redeemer = vec![];
-        let result1 = self.execution_layer.validate_script(&empty_script, &empty_redeemer, &script_context).await?;
+        let result1 = self
+            .execution_layer
+            .validate_script(&empty_script, &empty_redeemer, &script_context)
+            .await?;
         println!("✅ Empty script validation: {}", result1);
 
         // Test 2: Simple "always true" script simulation
         // Instead of invalid WASM, we'll use empty script which always returns true
         let simple_script = vec![]; // Empty script simulates "always true" validation
         let simple_redeemer = vec![0x04, 0x05, 0x06]; // Dummy redeemer
-        let result2 = self.execution_layer.validate_script(&simple_script, &simple_redeemer, &script_context).await;
-        
+        let result2 = self
+            .execution_layer
+            .validate_script(&simple_script, &simple_redeemer, &script_context)
+            .await;
+
         match result2 {
             Ok(valid) => println!("✅ Simple script validation: {}", valid),
             Err(e) => println!("❌ Simple script validation failed: {}", e),
         }
 
         // Test 3: Demonstrate WASM module requirement
-        println!("ℹ️  Note: Real eUTXO scripts require valid WASM modules with 'validate' function");
+        println!(
+            "ℹ️  Note: Real eUTXO scripts require valid WASM modules with 'validate' function"
+        );
         println!("   Example WASM script structure:");
         println!("   - Module must export 'validate(redeemer_ptr: u32, redeemer_len: u32) -> i32'");
         println!("   - Return 1 for valid, 0 for invalid");
-        println!("   - Can use host functions: get_utxo_value, get_current_slot, validate_signature");
+        println!(
+            "   - Can use host functions: get_utxo_value, get_current_slot, validate_signature"
+        );
 
         Ok(())
     }
@@ -292,14 +323,14 @@ fn main() -> anyhow::Result<()> {
 
     // Create async runtime
     let rt = tokio::runtime::Runtime::new()?;
-    
+
     rt.block_on(async {
         // Create and run the demo
         let mut demo = UtxoDemo::new()?;
-        
+
         // Run the main demonstration
         demo.run_demo().await?;
-        
+
         // Demonstrate script validation
         demo.demonstrate_script_validation().await?;
 

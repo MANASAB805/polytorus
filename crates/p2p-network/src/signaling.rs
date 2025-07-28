@@ -9,13 +9,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::{Result, Context};
-use log::{info, warn, error, debug};
+use anyhow::{Context, Result};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{TcpListener, TcpStream},
     sync::{broadcast, RwLock},
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
 };
 use uuid::Uuid;
 
@@ -23,10 +23,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SignalingMessage {
     /// Register a new peer with the signaling server
-    Register {
-        peer_id: String,
-        node_id: String,
-    },
+    Register { peer_id: String, node_id: String },
     /// SDP offer from initiating peer
     Offer {
         from: String,
@@ -50,21 +47,13 @@ pub enum SignalingMessage {
     /// List available peers
     ListPeers,
     /// Peer list response
-    PeerList {
-        peers: Vec<PeerDescriptor>,
-    },
+    PeerList { peers: Vec<PeerDescriptor> },
     /// Error response
-    Error {
-        message: String,
-    },
+    Error { message: String },
     /// Connection established confirmation
-    Connected {
-        peer_id: String,
-    },
+    Connected { peer_id: String },
     /// Peer disconnection notification
-    Disconnected {
-        peer_id: String,
-    },
+    Disconnected { peer_id: String },
 }
 
 /// Peer descriptor for signaling
@@ -124,7 +113,8 @@ impl SignalingServer {
 
     /// Start the signaling server
     pub async fn start(&self) -> Result<()> {
-        let listener = TcpListener::bind(self.listen_addr).await
+        let listener = TcpListener::bind(self.listen_addr)
+            .await
             .context("Failed to bind signaling server")?;
 
         info!("🔗 Signaling server listening on: {}", self.listen_addr);
@@ -138,9 +128,10 @@ impl SignalingServer {
                     let broadcast_tx = self.broadcast_tx.clone();
 
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_peer_connection(
-                            stream, addr, peers, stats, broadcast_tx
-                        ).await {
+                        if let Err(e) =
+                            Self::handle_peer_connection(stream, addr, peers, stats, broadcast_tx)
+                                .await
+                        {
                             error!("❌ Error handling peer connection {}: {}", addr, e);
                         }
                     });
@@ -227,7 +218,9 @@ impl SignalingServer {
                         &stats,
                         &peer_tx,
                         &broadcast_tx,
-                    ).await {
+                    )
+                    .await
+                    {
                         error!("❌ Error processing message from {}: {}", addr, e);
                     }
                 }
@@ -271,7 +264,10 @@ impl SignalingServer {
         _broadcast_tx: &broadcast::Sender<(String, SignalingMessage)>,
     ) -> Result<()> {
         match message {
-            SignalingMessage::Register { peer_id: reg_peer_id, node_id } => {
+            SignalingMessage::Register {
+                peer_id: reg_peer_id,
+                node_id,
+            } => {
                 info!("📝 Registering peer: {} (node: {})", reg_peer_id, node_id);
 
                 let connected_peer = ConnectedPeer {
@@ -296,11 +292,13 @@ impl SignalingServer {
             SignalingMessage::ListPeers => {
                 let peer_list = {
                     let peers = peers.read().await;
-                    peers.values()
+                    peers
+                        .values()
                         .map(|p| PeerDescriptor {
                             peer_id: p.peer_id.clone(),
                             node_id: p.node_id.clone(),
-                            connected_at: p.connected_at
+                            connected_at: p
+                                .connected_at
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap_or_default()
                                 .as_secs(),
@@ -309,13 +307,15 @@ impl SignalingServer {
                         .collect()
                 };
 
-                let response = SignalingMessage::PeerList {
-                    peers: peer_list,
-                };
+                let response = SignalingMessage::PeerList { peers: peer_list };
                 peer_tx.send(response)?;
             }
 
-            SignalingMessage::Offer { ref from, ref to, sdp: _ } => {
+            SignalingMessage::Offer {
+                ref from,
+                ref to,
+                sdp: _,
+            } => {
                 info!("📋 Relaying offer from {} to {}", from, to);
                 let target_id = to.clone();
                 Self::relay_message_to_peer(&target_id, message, peers).await?;
@@ -327,7 +327,11 @@ impl SignalingServer {
                 }
             }
 
-            SignalingMessage::Answer { ref from, ref to, sdp: _ } => {
+            SignalingMessage::Answer {
+                ref from,
+                ref to,
+                sdp: _,
+            } => {
                 info!("📝 Relaying answer from {} to {}", from, to);
                 let target_id = to.clone();
                 Self::relay_message_to_peer(&target_id, message, peers).await?;
@@ -339,7 +343,9 @@ impl SignalingServer {
                 }
             }
 
-            SignalingMessage::IceCandidate { ref from, ref to, .. } => {
+            SignalingMessage::IceCandidate {
+                ref from, ref to, ..
+            } => {
                 debug!("🧊 Relaying ICE candidate from {} to {}", from, to);
                 let target_id = to.clone();
                 Self::relay_message_to_peer(&target_id, message, peers).await?;
@@ -367,7 +373,9 @@ impl SignalingServer {
     ) -> Result<()> {
         let peers = peers.read().await;
         if let Some(target_peer) = peers.get(target_peer_id) {
-            target_peer.sender.send(message)
+            target_peer
+                .sender
+                .send(message)
                 .context("Failed to send message to target peer")?;
             debug!("📤 Message relayed to peer: {}", target_peer_id);
         } else {
@@ -395,11 +403,13 @@ impl SignalingServer {
     /// Get list of connected peers
     pub async fn get_connected_peers(&self) -> Vec<PeerDescriptor> {
         let peers = self.peers.read().await;
-        peers.values()
+        peers
+            .values()
             .map(|p| PeerDescriptor {
                 peer_id: p.peer_id.clone(),
                 node_id: p.node_id.clone(),
-                connected_at: p.connected_at
+                connected_at: p
+                    .connected_at
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs(),

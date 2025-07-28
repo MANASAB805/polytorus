@@ -10,6 +10,36 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  format:
+    name: Auto Format
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref }}
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+    
+    - name: Run cargo fmt
+      run: cargo fmt
+    
+    - name: Commit changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        if git diff --staged --quiet; then
+          echo "No formatting changes needed"
+        else
+          git commit -m "Auto-format code with cargo fmt"
+          git push
+        fi
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -30,15 +60,11 @@ jobs:
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     
+    - name: Build
+      run: cargo build --verbose
+    
     - name: Run tests
       run: cargo test --verbose
-    
-    - name: Run layer tests
-      run: |
-        cargo test -p execution --verbose
-        cargo test -p settlement --verbose
-        cargo test -p consensus --verbose
-        cargo test -p data-availability --verbose
 
   lint:
     name: Lint
@@ -49,20 +75,7 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
-        components: rustfmt, clippy
-    
-    - name: Check formatting
-      run: cargo fmt -- --check
+        components: clippy
     
     - name: Run clippy
       run: cargo clippy -- -D warnings
-    
-    - name: Check for compilation warnings
-      run: |
-        cargo build 2>&1 | tee build.log
-        if grep -i warning build.log; then
-          echo "Build contains warnings!"
-          exit 1
-        else
-          echo "Clean build!"
-        fi

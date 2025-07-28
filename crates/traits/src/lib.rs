@@ -112,8 +112,8 @@ pub struct UtxoId {
 pub struct Utxo {
     pub id: UtxoId,
     pub value: u64,
-    pub script: Vec<u8>, // Script/smart contract code
-    pub datum: Option<Vec<u8>>, // Extended data (for eUTXO)
+    pub script: Vec<u8>,          // Script/smart contract code
+    pub datum: Option<Vec<u8>>,   // Extended data (for eUTXO)
     pub datum_hash: Option<Hash>, // Hash of the datum
 }
 
@@ -129,7 +129,7 @@ pub struct TxInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxOutput {
     pub value: u64,
-    pub script: Vec<u8>, // Locking script
+    pub script: Vec<u8>,        // Locking script
     pub datum: Option<Vec<u8>>, // Associated data
     pub datum_hash: Option<Hash>,
 }
@@ -142,8 +142,8 @@ pub struct UtxoTransaction {
     pub outputs: Vec<TxOutput>,
     pub fee: u64,
     pub validity_range: Option<(u64, u64)>, // (start_slot, end_slot)
-    pub script_witness: Vec<Vec<u8>>, // Witness data for scripts
-    pub auxiliary_data: Option<Vec<u8>>, // Metadata
+    pub script_witness: Vec<Vec<u8>>,       // Witness data for scripts
+    pub auxiliary_data: Option<Vec<u8>>,    // Metadata
 }
 
 /// UTXO set state
@@ -332,31 +332,42 @@ pub struct DataEntry {
 pub trait ExecutionLayer: Send + Sync {
     /// Execute a single transaction
     async fn execute_transaction(&mut self, tx: &Transaction) -> Result<TransactionReceipt>;
-    
+
     /// Execute a batch of transactions (rollup)
     async fn execute_batch(&mut self, transactions: Vec<Transaction>) -> Result<ExecutionBatch>;
-    
+
     /// Get current state root
     async fn get_state_root(&self) -> Result<Hash>;
-    
+
     /// Get account state
     async fn get_account_state(&self, address: &Address) -> Result<AccountState>;
-    
+
     /// Begin execution context
     async fn begin_execution(&mut self) -> Result<()>;
-    
+
     /// Commit execution results
     async fn commit_execution(&mut self) -> Result<Hash>;
-    
+
     /// Rollback execution
     async fn rollback_execution(&mut self) -> Result<()>;
-    
+
     /// Deploy a script
-    async fn deploy_script(&mut self, owner: &Address, script_data: &[u8], init_params: &[u8]) -> Result<Hash>;
-    
+    async fn deploy_script(
+        &mut self,
+        owner: &Address,
+        script_data: &[u8],
+        init_params: &[u8],
+    ) -> Result<Hash>;
+
     /// Execute a script
-    async fn execute_script(&mut self, script_hash: &Hash, method: &str, params: &[u8], context: ScriptExecutionContext) -> Result<ScriptExecutionResult>;
-    
+    async fn execute_script(
+        &mut self,
+        script_hash: &Hash,
+        method: &str,
+        params: &[u8],
+        context: ScriptExecutionContext,
+    ) -> Result<ScriptExecutionResult>;
+
     /// Get script metadata
     async fn get_script_metadata(&self, script_hash: &Hash) -> Result<Option<ScriptMetadata>>;
 }
@@ -365,32 +376,43 @@ pub trait ExecutionLayer: Send + Sync {
 #[async_trait::async_trait]
 pub trait UtxoExecutionLayer: Send + Sync {
     /// Execute a single eUTXO transaction
-    async fn execute_utxo_transaction(&mut self, tx: &UtxoTransaction) -> Result<UtxoTransactionReceipt>;
-    
+    async fn execute_utxo_transaction(
+        &mut self,
+        tx: &UtxoTransaction,
+    ) -> Result<UtxoTransactionReceipt>;
+
     /// Execute a batch of eUTXO transactions
-    async fn execute_utxo_batch(&mut self, transactions: Vec<UtxoTransaction>) -> Result<UtxoExecutionBatch>;
-    
+    async fn execute_utxo_batch(
+        &mut self,
+        transactions: Vec<UtxoTransaction>,
+    ) -> Result<UtxoExecutionBatch>;
+
     /// Get current UTXO set hash
     async fn get_utxo_set_hash(&self) -> Result<Hash>;
-    
+
     /// Get UTXO by ID
     async fn get_utxo(&self, utxo_id: &UtxoId) -> Result<Option<Utxo>>;
-    
+
     /// Get all UTXOs for a script hash (address)
     async fn get_utxos_by_script(&self, script_hash: &Hash) -> Result<Vec<Utxo>>;
-    
+
     /// Validate script execution
-    async fn validate_script(&self, script: &[u8], redeemer: &[u8], context: &ScriptContext) -> Result<bool>;
-    
+    async fn validate_script(
+        &self,
+        script: &[u8],
+        redeemer: &[u8],
+        context: &ScriptContext,
+    ) -> Result<bool>;
+
     /// Begin UTXO execution context
     async fn begin_utxo_execution(&mut self) -> Result<()>;
-    
+
     /// Commit UTXO execution results
     async fn commit_utxo_execution(&mut self) -> Result<Hash>;
-    
+
     /// Rollback UTXO execution
     async fn rollback_utxo_execution(&mut self) -> Result<()>;
-    
+
     /// Get total value in UTXO set
     async fn get_total_supply(&self) -> Result<u64>;
 }
@@ -429,20 +451,20 @@ pub struct ScriptMetadata {
 }
 
 /// Settlement Layer Interface - 紛争解決と最終確定
-#[async_trait::async_trait] 
+#[async_trait::async_trait]
 pub trait SettlementLayer: Send + Sync {
     /// Settle execution batch
     async fn settle_batch(&mut self, batch: &ExecutionBatch) -> Result<SettlementResult>;
-    
+
     /// Submit fraud proof challenge
     async fn submit_challenge(&mut self, challenge: SettlementChallenge) -> Result<()>;
-    
+
     /// Process challenge resolution
     async fn process_challenge(&mut self, challenge_id: &Hash) -> Result<ChallengeResult>;
-    
+
     /// Get settlement root
     async fn get_settlement_root(&self) -> Result<Hash>;
-    
+
     /// Get settlement history
     async fn get_settlement_history(&self, limit: usize) -> Result<Vec<SettlementResult>>;
 }
@@ -452,34 +474,34 @@ pub trait SettlementLayer: Send + Sync {
 pub trait ConsensusLayer: Send + Sync {
     /// Propose new block
     async fn propose_block(&mut self, block: Block) -> Result<()>;
-    
+
     /// Validate block proposal
     async fn validate_block(&self, block: &Block) -> Result<bool>;
-    
+
     /// Get canonical chain
     async fn get_canonical_chain(&self) -> Result<Vec<Hash>>;
-    
+
     /// Get current block height
     async fn get_block_height(&self) -> Result<u64>;
-    
+
     /// Get block by hash
     async fn get_block_by_hash(&self, hash: &Hash) -> Result<Option<Block>>;
-    
+
     /// Add validated block to chain
     async fn add_block(&mut self, block: Block) -> Result<()>;
-    
+
     /// Check if node is validator
     async fn is_validator(&self) -> Result<bool>;
-    
+
     /// Get validator set
     async fn get_validator_set(&self) -> Result<Vec<ValidatorInfo>>;
-    
+
     /// Mine a new block with PoW
     async fn mine_block(&mut self, transactions: Vec<Transaction>) -> Result<Block>;
-    
+
     /// Get current mining difficulty
     async fn get_difficulty(&self) -> Result<usize>;
-    
+
     /// Set mining difficulty
     async fn set_difficulty(&mut self, difficulty: usize) -> Result<()>;
 }
@@ -489,40 +511,40 @@ pub trait ConsensusLayer: Send + Sync {
 pub trait UtxoConsensusLayer: Send + Sync {
     /// Propose new eUTXO block
     async fn propose_utxo_block(&mut self, block: UtxoBlock) -> Result<()>;
-    
+
     /// Validate eUTXO block proposal
     async fn validate_utxo_block(&self, block: &UtxoBlock) -> Result<bool>;
-    
+
     /// Get canonical chain
     async fn get_canonical_chain(&self) -> Result<Vec<Hash>>;
-    
+
     /// Get current block height
     async fn get_block_height(&self) -> Result<u64>;
-    
+
     /// Get current slot
     async fn get_current_slot(&self) -> Result<u64>;
-    
+
     /// Get block by hash
     async fn get_utxo_block_by_hash(&self, hash: &Hash) -> Result<Option<UtxoBlock>>;
-    
+
     /// Add validated block to chain
     async fn add_utxo_block(&mut self, block: UtxoBlock) -> Result<()>;
-    
+
     /// Check if node is validator
     async fn is_validator(&self) -> Result<bool>;
-    
+
     /// Get validator set
     async fn get_validator_set(&self) -> Result<Vec<ValidatorInfo>>;
-    
+
     /// Mine a new eUTXO block
     async fn mine_utxo_block(&mut self, transactions: Vec<UtxoTransaction>) -> Result<UtxoBlock>;
-    
+
     /// Get current mining difficulty
     async fn get_difficulty(&self) -> Result<usize>;
-    
+
     /// Set mining difficulty
     async fn set_difficulty(&mut self, difficulty: usize) -> Result<()>;
-    
+
     /// Validate slot timing
     async fn validate_slot_timing(&self, slot: u64, timestamp: u64) -> Result<bool>;
 }
@@ -532,22 +554,22 @@ pub trait UtxoConsensusLayer: Send + Sync {
 pub trait DataAvailabilityLayer: Send + Sync {
     /// Store data and return hash
     async fn store_data(&mut self, data: &[u8]) -> Result<Hash>;
-    
+
     /// Retrieve data by hash
     async fn retrieve_data(&self, hash: &Hash) -> Result<Option<Vec<u8>>>;
-    
+
     /// Verify data availability
     async fn verify_availability(&self, hash: &Hash) -> Result<bool>;
-    
+
     /// Broadcast data to network
     async fn broadcast_data(&mut self, hash: &Hash, data: &[u8]) -> Result<()>;
-    
+
     /// Request data from peers
     async fn request_data(&mut self, hash: &Hash) -> Result<()>;
-    
+
     /// Get availability proof
     async fn get_availability_proof(&self, hash: &Hash) -> Result<Option<AvailabilityProof>>;
-    
+
     /// Get data entry metadata
     async fn get_data_entry(&self, hash: &Hash) -> Result<Option<DataEntry>>;
 }
@@ -557,28 +579,28 @@ pub trait DataAvailabilityLayer: Send + Sync {
 pub trait P2PNetworkLayer: Send + Sync {
     /// Start the P2P network
     async fn start(&self) -> Result<()>;
-    
+
     /// Connect to a specific peer
     async fn connect_to_peer(&self, peer_id: String, peer_address: String) -> Result<()>;
-    
+
     /// Send transaction to the network
     async fn broadcast_transaction(&self, tx: &UtxoTransaction) -> Result<()>;
-    
+
     /// Send block to the network
     async fn broadcast_block(&self, block: &UtxoBlock) -> Result<()>;
-    
+
     /// Request data from peers
     async fn request_blockchain_data(&self, data_type: String, data_hash: Hash) -> Result<()>;
-    
+
     /// Get list of connected peers
     async fn get_connected_peers(&self) -> Vec<String>;
-    
+
     /// Get peer information
     async fn get_peer_info(&self, peer_id: &str) -> Result<Option<String>>;
-    
+
     /// Disconnect from a specific peer
     async fn disconnect_peer(&self, peer_id: &str) -> Result<()>;
-    
+
     /// Shutdown the P2P network
     async fn shutdown(&self) -> Result<()>;
 }

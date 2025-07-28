@@ -1,18 +1,17 @@
 use anyhow::Result;
 use clap::{Arg, Command};
-use log::{info, error};
-use std::env;
+use log::{error, info};
 use std::collections::HashMap;
+use std::env;
 
-use execution::execution_engine::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
 use consensus::consensus_engine::{PolyTorusUtxoConsensusLayer, UtxoConsensusConfig};
-use p2p_network::{WebRTCP2PNetwork, P2PConfig};
-use traits::{
-    UtxoExecutionLayer, UtxoConsensusLayer, UtxoTransaction, UtxoId,
-    TxInput, TxOutput, ScriptTransactionType, ExecutionLayer,
-    Transaction, Hash
-};
+use execution::execution_engine::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
 use execution::script_engine::ScriptType;
+use p2p_network::{P2PConfig, WebRTCP2PNetwork};
+use traits::{
+    ExecutionLayer, Hash, ScriptTransactionType, Transaction, TxInput, TxOutput,
+    UtxoConsensusLayer, UtxoExecutionLayer, UtxoId, UtxoTransaction,
+};
 use wallet::{HdWallet, KeyPair, KeyType, Wallet};
 
 pub struct PolyTorusBlockchain {
@@ -30,21 +29,23 @@ impl PolyTorusBlockchain {
 
     pub fn new_with_p2p_config(p2p_config: Option<P2PConfig>) -> Result<Self> {
         let execution_config = UtxoExecutionConfig::default();
-        
+
         // テスト用設定: PoW難易度を0に設定
         let consensus_config = UtxoConsensusConfig {
-            difficulty: 0, // 即座にマイニング完了
+            difficulty: 0,  // 即座にマイニング完了
             slot_time: 100, // 100ms slot time for faster testing
             ..UtxoConsensusConfig::default()
         };
-        
-        info!("Using test configuration: difficulty={}, slot_time={}ms", 
-              consensus_config.difficulty, consensus_config.slot_time);
+
+        info!(
+            "Using test configuration: difficulty={}, slot_time={}ms",
+            consensus_config.difficulty, consensus_config.slot_time
+        );
 
         let execution_layer = PolyTorusUtxoExecutionLayer::new(execution_config)?;
         let consensus_layer = PolyTorusUtxoConsensusLayer::new_as_validator(
             consensus_config,
-            "main_validator".to_string()
+            "main_validator".to_string(),
         )?;
 
         // Initialize P2P network with provided or default config
@@ -52,9 +53,10 @@ impl PolyTorusBlockchain {
         let p2p_network = WebRTCP2PNetwork::new(p2p_config)?;
 
         // Initialize HD wallet
-        let wallet = HdWallet::new(KeyType::Ed25519).map_err(|e| anyhow::anyhow!("Failed to create HD wallet: {:?}", e))?;
+        let wallet = HdWallet::new(KeyType::Ed25519)
+            .map_err(|e| anyhow::anyhow!("Failed to create HD wallet: {:?}", e))?;
         let mnemonic = wallet.get_mnemonic().phrase();
-        
+
         info!("Initialized HD wallet with mnemonic: {}", mnemonic);
 
         Ok(Self {
@@ -73,11 +75,11 @@ impl PolyTorusBlockchain {
             .unwrap_or_else(|_| "8080".to_string())
             .parse::<u16>()
             .unwrap_or(8080);
-        
+
         let bootstrap_peers = env::var("BOOTSTRAP_PEERS")
             .map(|peers| peers.split(',').map(|s| s.trim().to_string()).collect())
             .unwrap_or_else(|_| Vec::new());
-            
+
         let debug_mode = env::var("DEBUG_MODE").unwrap_or_else(|_| "false".to_string()) == "true";
 
         P2PConfig {
@@ -107,7 +109,7 @@ impl PolyTorusBlockchain {
 
     pub async fn initialize_genesis(&mut self) -> Result<UtxoId> {
         info!("Starting genesis UTXO initialization");
-        
+
         let genesis_utxo_id = UtxoId {
             tx_hash: "genesis_tx".to_string(),
             output_index: 0,
@@ -116,13 +118,14 @@ impl PolyTorusBlockchain {
         let genesis_utxo = traits::Utxo {
             id: genesis_utxo_id.clone(),
             value: 10_000_000, // 10M units initial supply
-            script: vec![], // Empty script = "always true"
+            script: vec![],    // Empty script = "always true"
             datum: Some(b"Genesis UTXO for PolyTorus".to_vec()),
             datum_hash: Some("genesis_datum_hash".to_string()),
         };
 
         info!("Calling initialize_genesis_utxo_set");
-        self.execution_layer.initialize_genesis_utxo_set(vec![(genesis_utxo_id.clone(), genesis_utxo)])?;
+        self.execution_layer
+            .initialize_genesis_utxo_set(vec![(genesis_utxo_id.clone(), genesis_utxo)])?;
         info!("Genesis UTXO created: {:?}", genesis_utxo_id);
         info!("Genesis initialization completed successfully");
         Ok(genesis_utxo_id)
@@ -131,14 +134,19 @@ impl PolyTorusBlockchain {
     fn get_or_create_wallet(&mut self, user: &str) -> Result<&(KeyPair, Wallet)> {
         if !self.user_wallets.contains_key(user) {
             let index = self.user_wallets.len() as u32;
-            let keypair = self.wallet.derive_key(index)
+            let keypair = self
+                .wallet
+                .derive_key(index)
                 .map_err(|e| anyhow::anyhow!("Failed to derive keypair for {}: {:?}", user, e))?;
-            
+
             // Use a fixed coin type for now
-            let user_wallet = self.wallet.derive_receiving_wallet(0, 0, index, KeyType::Ed25519)
+            let user_wallet = self
+                .wallet
+                .derive_receiving_wallet(0, 0, index, KeyType::Ed25519)
                 .map_err(|e| anyhow::anyhow!("Failed to derive wallet for {}: {:?}", user, e))?;
-            
-            self.user_wallets.insert(user.to_string(), (keypair, user_wallet));
+
+            self.user_wallets
+                .insert(user.to_string(), (keypair, user_wallet));
             info!("Created new wallet for user: {} (index: {})", user, index);
         }
         Ok(self.user_wallets.get(user).unwrap())
@@ -147,17 +155,13 @@ impl PolyTorusBlockchain {
     fn get_address(&mut self, user: &str) -> Result<String> {
         self.get_or_create_wallet(user)?;
         let (_keypair, wallet) = self.user_wallets.get_mut(user).unwrap();
-        let address = wallet.default_address()
+        let address = wallet
+            .default_address()
             .map_err(|e| anyhow::anyhow!("Failed to get address for {}: {:?}", user, e))?;
         Ok(address.to_string())
     }
 
-    pub async fn send_transaction(
-        &mut self,
-        from: &str,
-        to: &str,
-        amount: u64,
-    ) -> Result<String> {
+    pub async fn send_transaction(&mut self, from: &str, to: &str, amount: u64) -> Result<String> {
         // Use the genesis UTXO as the source for all transactions (simplified demo)
         let from_utxo_id = UtxoId {
             tx_hash: "genesis_tx".to_string(),
@@ -167,24 +171,29 @@ impl PolyTorusBlockchain {
         let tx_hash = format!("tx_{}_{}_{}_{}", from, to, amount, uuid::Uuid::new_v4());
         let fee = 1000; // Fixed fee
         let genesis_value = 10_000_000; // Match the genesis UTXO value
-        
+
         if amount + fee > genesis_value {
-            return Err(anyhow::anyhow!("Insufficient funds: need {} but genesis UTXO has {}", amount + fee, genesis_value));
+            return Err(anyhow::anyhow!(
+                "Insufficient funds: need {} but genesis UTXO has {}",
+                amount + fee,
+                genesis_value
+            ));
         }
-        
+
         let change = genesis_value - amount - fee;
 
         // Get real addresses for from and to
         let from_address = self.get_address(from)?;
         let to_address = self.get_address(to)?;
-        
+
         // Get wallet for signing
         self.get_or_create_wallet(from)?;
         let (_keypair, from_wallet) = self.user_wallets.get_mut(from).unwrap();
-        
+
         // Create message to sign (transaction hash)
         let message = tx_hash.as_bytes();
-        let signature = from_wallet.sign(message)
+        let signature = from_wallet
+            .sign(message)
             .map_err(|e| anyhow::anyhow!("Failed to sign transaction: {:?}", e))?;
 
         let transaction = UtxoTransaction {
@@ -211,7 +220,13 @@ impl PolyTorusBlockchain {
             fee,
             validity_range: Some((0, 1000)),
             script_witness: vec![format!("wallet_signature_{}", from_address).into_bytes()],
-            auxiliary_data: Some(format!("Transfer from {} ({}) to {} ({})", from, from_address, to, to_address).into_bytes()),
+            auxiliary_data: Some(
+                format!(
+                    "Transfer from {} ({}) to {} ({})",
+                    from, from_address, to, to_address
+                )
+                .into_bytes(),
+            ),
         };
 
         info!("Transaction created with real wallet signatures:");
@@ -220,16 +235,26 @@ impl PolyTorusBlockchain {
         info!("  Signature length: {}", signature.as_bytes().len());
 
         info!("Executing transaction: {}", tx_hash);
-        
-        match self.execution_layer.execute_utxo_transaction(&transaction).await {
+
+        match self
+            .execution_layer
+            .execute_utxo_transaction(&transaction)
+            .await
+        {
             Ok(receipt) => {
                 info!("Transaction executed successfully: {}", receipt.success);
-                
+
                 // Mine a block with this transaction
                 info!("Starting block mining for transaction: {}", tx_hash);
-                let block = self.consensus_layer.mine_utxo_block(vec![transaction]).await?;
-                info!("Block mined successfully: {} (slot {})", block.hash, block.slot);
-                
+                let block = self
+                    .consensus_layer
+                    .mine_utxo_block(vec![transaction])
+                    .await?;
+                info!(
+                    "Block mined successfully: {} (slot {})",
+                    block.hash, block.slot
+                );
+
                 // Validate and add block
                 let is_valid = self.consensus_layer.validate_utxo_block(&block).await?;
                 if is_valid {
@@ -238,7 +263,7 @@ impl PolyTorusBlockchain {
                 } else {
                     error!("Block validation failed");
                 }
-                
+
                 Ok(tx_hash)
             }
             Err(e) => {
@@ -266,11 +291,16 @@ impl PolyTorusBlockchain {
         Ok(())
     }
 
-    pub async fn deploy_contract(&mut self, owner: &str, wasm_bytes: Vec<u8>, name: Option<&str>) -> Result<Hash> {
+    pub async fn deploy_contract(
+        &mut self,
+        owner: &str,
+        wasm_bytes: Vec<u8>,
+        name: Option<&str>,
+    ) -> Result<Hash> {
         info!("Deploying WASM contract for owner: {}", owner);
-        
+
         let tx_hash = format!("tx_deploy_contract_{}_{}", owner, uuid::Uuid::new_v4());
-        
+
         // Create deployment transaction
         let transaction = Transaction {
             hash: tx_hash.clone(),
@@ -287,35 +317,40 @@ impl PolyTorusBlockchain {
                 init_params: vec![],
             }),
         };
-        
+
         // Sign transaction
         self.get_or_create_wallet(owner)?;
         let (_keypair, from_wallet) = self.user_wallets.get_mut(owner).unwrap();
-        let signature = from_wallet.sign(tx_hash.as_bytes())
+        let signature = from_wallet
+            .sign(tx_hash.as_bytes())
             .map_err(|e| anyhow::anyhow!("Failed to sign deployment: {:?}", e))?;
-        
+
         let mut signed_transaction = transaction;
         signed_transaction.signature = signature.as_bytes().to_vec();
-        
+
         // Convert to UTXO transaction for execution
         let utxo_tx = self.convert_to_utxo_transaction(&signed_transaction)?;
-        
+
         // Execute deployment
-        match self.execution_layer.execute_utxo_transaction(&utxo_tx).await {
+        match self
+            .execution_layer
+            .execute_utxo_transaction(&utxo_tx)
+            .await
+        {
             Ok(receipt) => {
                 info!("Contract deployed successfully: {}", receipt.success);
-                
+
                 // Mine a block with the deployment transaction
                 let block = self.consensus_layer.mine_utxo_block(vec![utxo_tx]).await?;
                 info!("Block mined: {} (slot {})", block.hash, block.slot);
-                
+
                 // Validate and add block
                 let is_valid = self.consensus_layer.validate_utxo_block(&block).await?;
                 if is_valid {
                     self.consensus_layer.add_utxo_block(block).await?;
                     info!("Deployment block added to chain");
                 }
-                
+
                 Ok(tx_hash)
             }
             Err(e) => {
@@ -325,11 +360,17 @@ impl PolyTorusBlockchain {
         }
     }
 
-    pub async fn call_contract(&mut self, from: &str, contract_hash: &str, method: &str, params: Vec<u8>) -> Result<String> {
+    pub async fn call_contract(
+        &mut self,
+        from: &str,
+        contract_hash: &str,
+        method: &str,
+        params: Vec<u8>,
+    ) -> Result<String> {
         let tx_hash = format!("tx_contract_call_{}_{}", from, uuid::Uuid::new_v4());
-        
+
         info!("Creating contract call transaction: {}", tx_hash);
-        
+
         // Create a transaction with script call
         let transaction = Transaction {
             hash: tx_hash.clone(),
@@ -347,37 +388,42 @@ impl PolyTorusBlockchain {
                 params,
             }),
         };
-        
+
         // Sign transaction with wallet
         self.get_or_create_wallet(from)?;
         let (_keypair, from_wallet) = self.user_wallets.get_mut(from).unwrap();
-        let signature = from_wallet.sign(tx_hash.as_bytes())
+        let signature = from_wallet
+            .sign(tx_hash.as_bytes())
             .map_err(|e| anyhow::anyhow!("Failed to sign contract call: {:?}", e))?;
-        
+
         let mut signed_transaction = transaction;
         signed_transaction.signature = signature.as_bytes().to_vec();
-        
+
         info!("Executing contract call transaction");
-        
+
         // Convert to UTXO transaction and execute
         let utxo_tx = self.convert_to_utxo_transaction(&signed_transaction)?;
-        
-        match self.execution_layer.execute_utxo_transaction(&utxo_tx).await {
+
+        match self
+            .execution_layer
+            .execute_utxo_transaction(&utxo_tx)
+            .await
+        {
             Ok(receipt) => {
                 info!("Contract call executed successfully: {}", receipt.success);
-                
+
                 // Mine a block with this transaction
                 info!("Mining block for contract call");
                 let block = self.consensus_layer.mine_utxo_block(vec![utxo_tx]).await?;
                 info!("Block mined: {} (slot {})", block.hash, block.slot);
-                
+
                 // Validate and add block
                 let is_valid = self.consensus_layer.validate_utxo_block(&block).await?;
                 if is_valid {
                     self.consensus_layer.add_utxo_block(block).await?;
                     info!("Block added to chain");
                 }
-                
+
                 Ok(tx_hash)
             }
             Err(e) => {
@@ -403,9 +449,10 @@ impl PolyTorusBlockchain {
             fee: 1000, // Fixed fee for conversion
             validity_range: Some((0, 1000)),
             script_witness: vec![],
-            auxiliary_data: tx.script_type.as_ref().map(|st| {
-                format!("Contract call: {:?}", st).into_bytes()
-            }),
+            auxiliary_data: tx
+                .script_type
+                .as_ref()
+                .map(|st| format!("Contract call: {:?}", st).into_bytes()),
         })
     }
 }
@@ -419,103 +466,123 @@ async fn async_main() -> Result<()> {
     // Docker output debugging
     println!("🐳 PolyTorus starting in Docker container...");
     eprintln!("🐳 PolyTorus stderr test...");
-    
+
     // Initialize logging
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", "info");
     }
     env_logger::init();
-    
+
     println!("🐳 Environment initialized, parsing commands...");
 
     let matches = Command::new("polytorus")
         .version("0.1.0")
         .author("quantumshiro")
         .about("PolyTorus - 4-Layer Modular Blockchain Platform")
-        .subcommand(
-            Command::new("start")
-                .about("Initialize and start the blockchain node")
-        )
+        .subcommand(Command::new("start").about("Initialize and start the blockchain node"))
         .subcommand(
             Command::new("start-p2p")
                 .about("Start the blockchain node with P2P networking")
-                .arg(Arg::new("node-id")
-                    .long("node-id")
-                    .value_name("NODE_ID")
-                    .help("Node identifier"))
-                .arg(Arg::new("listen-port")
-                    .long("listen-port")
-                    .value_name("PORT")
-                    .help("Port to listen on for P2P connections")
-                    .default_value("8080"))
-                .arg(Arg::new("bootstrap-peers")
-                    .long("bootstrap-peers")
-                    .value_name("PEERS")
-                    .help("Comma-separated list of bootstrap peer addresses"))
+                .arg(
+                    Arg::new("node-id")
+                        .long("node-id")
+                        .value_name("NODE_ID")
+                        .help("Node identifier"),
+                )
+                .arg(
+                    Arg::new("listen-port")
+                        .long("listen-port")
+                        .value_name("PORT")
+                        .help("Port to listen on for P2P connections")
+                        .default_value("8080"),
+                )
+                .arg(
+                    Arg::new("bootstrap-peers")
+                        .long("bootstrap-peers")
+                        .value_name("PEERS")
+                        .help("Comma-separated list of bootstrap peer addresses"),
+                ),
         )
         .subcommand(
             Command::new("send")
                 .about("Send a transaction")
-                .arg(Arg::new("from")
-                    .long("from")
-                    .value_name("FROM")
-                    .help("Sender address")
-                    .required(true))
-                .arg(Arg::new("to")
-                    .long("to")
-                    .value_name("TO")
-                    .help("Recipient address")
-                    .required(true))
-                .arg(Arg::new("amount")
-                    .long("amount")
-                    .value_name("AMOUNT")
-                    .help("Amount to send")
-                    .required(true))
+                .arg(
+                    Arg::new("from")
+                        .long("from")
+                        .value_name("FROM")
+                        .help("Sender address")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("to")
+                        .long("to")
+                        .value_name("TO")
+                        .help("Recipient address")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("amount")
+                        .long("amount")
+                        .value_name("AMOUNT")
+                        .help("Amount to send")
+                        .required(true),
+                ),
         )
-        .subcommand(
-            Command::new("status")
-                .about("Show blockchain status")
-        )
+        .subcommand(Command::new("status").about("Show blockchain status"))
         .subcommand(
             Command::new("deploy-contract")
                 .about("Deploy a smart contract")
-                .arg(Arg::new("wasm-file")
-                    .long("wasm-file")
-                    .value_name("FILE")
-                    .help("Path to the compiled WASM contract file")
-                    .required(true))
-                .arg(Arg::new("owner")
-                    .long("owner")
-                    .value_name("OWNER")
-                    .help("Contract owner address")
-                    .required(true))
-                .arg(Arg::new("name")
-                    .long("name")
-                    .value_name("NAME")
-                    .help("Contract name/description"))
+                .arg(
+                    Arg::new("wasm-file")
+                        .long("wasm-file")
+                        .value_name("FILE")
+                        .help("Path to the compiled WASM contract file")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("owner")
+                        .long("owner")
+                        .value_name("OWNER")
+                        .help("Contract owner address")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("name")
+                        .long("name")
+                        .value_name("NAME")
+                        .help("Contract name/description"),
+                ),
         )
         .subcommand(
             Command::new("call-contract")
                 .about("Call a smart contract method")
-                .arg(Arg::new("contract")
-                    .long("contract")
-                    .value_name("HASH")
-                    .help("Contract hash/address")
-                    .required(true))
-                .arg(Arg::new("method")
-                    .long("method")
-                    .value_name("METHOD")
-                    .help("Method to call")
-                    .required(true))
-                .arg(Arg::new("params")
-                    .long("params")
-                    .value_name("PARAMS")
-                    .help("Method parameters (JSON format)"))
-                .arg(Arg::new("from")
-                    .long("from")
-                    .value_name("FROM")
-                    .help("Caller address")
-                    .required(true))
+                .arg(
+                    Arg::new("contract")
+                        .long("contract")
+                        .value_name("HASH")
+                        .help("Contract hash/address")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("method")
+                        .long("method")
+                        .value_name("METHOD")
+                        .help("Method to call")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("params")
+                        .long("params")
+                        .value_name("PARAMS")
+                        .help("Method parameters (JSON format)"),
+                )
+                .arg(
+                    Arg::new("from")
+                        .long("from")
+                        .value_name("FROM")
+                        .help("Caller address")
+                        .required(true),
+                ),
         )
         .get_matches();
 
@@ -527,27 +594,30 @@ async fn async_main() -> Result<()> {
             info!("PolyTorus node started successfully");
             println!("✅ PolyTorus blockchain node started successfully");
             println!("Genesis UTXO initialized with 10,000,000 units");
-            
+
             info!("Start command completed successfully - exiting");
             return Ok(());
         }
         Some(("start-p2p", sub_matches)) => {
             info!("Starting PolyTorus blockchain node with P2P networking...");
-            
+
             // Build P2P configuration from arguments
-            let node_id = sub_matches.get_one::<String>("node-id")
+            let node_id = sub_matches
+                .get_one::<String>("node-id")
                 .map(|s| s.clone())
                 .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-            
-            let listen_port = sub_matches.get_one::<String>("listen-port")
+
+            let listen_port = sub_matches
+                .get_one::<String>("listen-port")
                 .unwrap()
                 .parse::<u16>()
                 .unwrap_or(8080);
-            
-            let bootstrap_peers = sub_matches.get_one::<String>("bootstrap-peers")
+
+            let bootstrap_peers = sub_matches
+                .get_one::<String>("bootstrap-peers")
                 .map(|peers| peers.split(',').map(|s| s.trim().to_string()).collect())
                 .unwrap_or_else(|| Vec::new());
-            
+
             let p2p_config = P2PConfig {
                 node_id: node_id.clone(),
                 listen_addr: format!("0.0.0.0:{}", listen_port).parse().unwrap(),
@@ -561,14 +631,14 @@ async fn async_main() -> Result<()> {
                 keep_alive_interval: 30,
                 debug_mode: true,
             };
-            
+
             let mut blockchain = PolyTorusBlockchain::new_with_p2p_config(Some(p2p_config))?;
             let _genesis_id = blockchain.initialize_genesis().await?;
-            
+
             println!("🚀 Starting PolyTorus P2P node: {}", node_id);
             println!("📡 Listening on port: {}", listen_port);
             println!("🔗 Bootstrap peers: {:?}", bootstrap_peers);
-            
+
             // Start P2P network
             info!("Starting P2P network...");
             blockchain.start_p2p_network().await?;
@@ -581,7 +651,7 @@ async fn async_main() -> Result<()> {
             info!("Sending transaction: {} -> {} ({})", from, to, amount);
             let mut blockchain = PolyTorusBlockchain::new()?;
             let _genesis_id = blockchain.initialize_genesis().await?;
-            
+
             match blockchain.send_transaction(from, to, amount).await {
                 Ok(tx_hash) => {
                     println!("✅ Transaction sent successfully");
@@ -606,18 +676,18 @@ async fn async_main() -> Result<()> {
             let wasm_file = sub_matches.get_one::<String>("wasm-file").unwrap();
             let owner = sub_matches.get_one::<String>("owner").unwrap();
             let name = sub_matches.get_one::<String>("name").map(|s| s.as_str());
-            
+
             info!("Deploying contract from: {}", wasm_file);
-            
+
             // Read WASM file
             let wasm_bytes = std::fs::read(wasm_file)
                 .map_err(|e| anyhow::anyhow!("Failed to read WASM file: {}", e))?;
-            
+
             info!("WASM file size: {} bytes", wasm_bytes.len());
-            
+
             let mut blockchain = PolyTorusBlockchain::new()?;
             let _genesis_id = blockchain.initialize_genesis().await?;
-            
+
             match blockchain.deploy_contract(owner, wasm_bytes, name).await {
                 Ok(script_hash) => {
                     println!("✅ Contract deployed successfully");
@@ -638,19 +708,22 @@ async fn async_main() -> Result<()> {
             let method = sub_matches.get_one::<String>("method").unwrap();
             let params = sub_matches.get_one::<String>("params").map(|s| s.as_str());
             let from = sub_matches.get_one::<String>("from").unwrap();
-            
+
             info!("Calling contract method: {}::{}", contract, method);
-            
+
             let mut blockchain = PolyTorusBlockchain::new()?;
             let _genesis_id = blockchain.initialize_genesis().await?;
-            
+
             let params_bytes = if let Some(p) = params {
                 p.as_bytes().to_vec()
             } else {
                 vec![]
             };
-            
-            match blockchain.call_contract(from, contract, method, params_bytes).await {
+
+            match blockchain
+                .call_contract(from, contract, method, params_bytes)
+                .await
+            {
                 Ok(tx_hash) => {
                     println!("✅ Contract call successful");
                     println!("Transaction Hash: {}", tx_hash);
@@ -700,14 +773,14 @@ mod integration_tests {
     async fn test_transaction_processing() -> Result<()> {
         let mut blockchain = PolyTorusBlockchain::new()?;
         let _genesis_id = blockchain.initialize_genesis().await?;
-        
+
         let tx_hash = blockchain.send_transaction("alice", "bob", 100_000).await?;
         assert!(!tx_hash.is_empty());
         assert!(tx_hash.starts_with("tx_alice_bob_100000_"));
         Ok(())
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn test_blockchain_status() -> Result<()> {
         let blockchain = PolyTorusBlockchain::new()?;
         // This should not panic

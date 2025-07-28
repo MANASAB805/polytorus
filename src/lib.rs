@@ -7,8 +7,8 @@
 //! - Data Availability: Data storage and distribution
 
 // Re-export the modular layer crates
-pub use execution;
-pub use settlement;
 pub use consensus;
 pub use data_availability;
+pub use execution;
+pub use settlement;
 pub use traits;

@@ -30,44 +30,33 @@
 
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
-    net::SocketAddr,
 };
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
-use serde_bytes;
-use log::{info, warn, error, debug};
-use serde::{Deserialize, Serialize};
-use tokio::{
-    sync::{mpsc, broadcast, RwLock},
-};
-use uuid::Uuid;
+use log::{debug, error, info, warn};
 use rand;
+use serde::{Deserialize, Serialize};
+use serde_bytes;
+use tokio::sync::{broadcast, mpsc, RwLock};
+use uuid::Uuid;
 
 use webrtc::{
     api::{
-        interceptor_registry::register_default_interceptors,
-        media_engine::MediaEngine,
-        APIBuilder,
+        interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder,
     },
-    data_channel::{
-        data_channel_message::DataChannelMessage,
-        RTCDataChannel,
-    },
-    ice_transport::{
-        ice_candidate::RTCIceCandidate,
-        ice_server::RTCIceServer,
-    },
+    data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel},
+    ice_transport::{ice_candidate::RTCIceCandidate, ice_server::RTCIceServer},
     peer_connection::{
-        configuration::RTCConfiguration,
-        peer_connection_state::RTCPeerConnectionState,
+        configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,
         RTCPeerConnection,
     },
 };
 
-use traits::{Hash, P2PNetworkLayer, UtxoTransaction, UtxoBlock};
+use traits::{Hash, P2PNetworkLayer, UtxoBlock, UtxoTransaction};
 
 pub mod peer;
 pub mod signaling;
@@ -121,15 +110,9 @@ pub enum P2PMessage {
         timestamp: u64,
     },
     /// Keep-alive ping message
-    Ping {
-        timestamp: u64,
-        nonce: u64,
-    },
+    Ping { timestamp: u64, nonce: u64 },
     /// Pong response to ping
-    Pong {
-        timestamp: u64,
-        nonce: u64,
-    },
+    Pong { timestamp: u64, nonce: u64 },
     /// Blockchain transaction data
     Transaction {
         tx_hash: Hash,
@@ -246,7 +229,7 @@ impl WebRTCP2PNetwork {
         // Create message channels
         let (message_tx, message_rx) = broadcast::channel(1000);
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
-        
+
         // Create WebRTC API with media engine and interceptors
         let mut media_engine = MediaEngine::default();
         let registry = register_default_interceptors(Default::default(), &mut media_engine)?;
@@ -255,9 +238,15 @@ impl WebRTCP2PNetwork {
             .with_interceptor_registry(registry)
             .build();
 
-        info!("🌐 Initializing WebRTC P2P Network for node: {}", config.node_id);
+        info!(
+            "🌐 Initializing WebRTC P2P Network for node: {}",
+            config.node_id
+        );
         info!("📡 STUN servers: {:?}", config.stun_servers);
-        info!("🔗 Max peers: {}, Timeout: {}s", config.max_peers, config.connection_timeout);
+        info!(
+            "🔗 Max peers: {}, Timeout: {}s",
+            config.max_peers, config.connection_timeout
+        );
 
         Ok(Self {
             config,
@@ -282,8 +271,11 @@ impl WebRTCP2PNetwork {
 
     /// Start the P2P network and begin accepting connections
     pub async fn start(&self) -> Result<()> {
-        info!("🚀 Starting WebRTC P2P Network on {}", self.config.listen_addr);
-        
+        info!(
+            "🚀 Starting WebRTC P2P Network on {}",
+            self.config.listen_addr
+        );
+
         // Update stats
         {
             let mut stats = self.stats.lock().unwrap();
@@ -293,9 +285,15 @@ impl WebRTCP2PNetwork {
         // Start connection to bootstrap peers
         for peer_addr in &self.config.bootstrap_peers {
             let peer_id = format!("bootstrap_{}", Uuid::new_v4());
-            match self.connect_to_peer(peer_id.clone(), peer_addr.clone()).await {
+            match self
+                .connect_to_peer(peer_id.clone(), peer_addr.clone())
+                .await
+            {
                 Ok(_) => info!("✅ Connected to bootstrap peer: {}", peer_addr),
-                Err(e) => warn!("❌ Failed to connect to bootstrap peer {}: {}", peer_addr, e),
+                Err(e) => warn!(
+                    "❌ Failed to connect to bootstrap peer {}: {}",
+                    peer_addr, e
+                ),
             }
         }
 
@@ -313,7 +311,9 @@ impl WebRTCP2PNetwork {
         // Wait for shutdown signal
         let mut shutdown_rx = {
             let mut rx_option = self.shutdown_rx.lock().unwrap();
-            rx_option.take().ok_or_else(|| anyhow::anyhow!("Shutdown receiver already taken"))?
+            rx_option
+                .take()
+                .ok_or_else(|| anyhow::anyhow!("Shutdown receiver already taken"))?
         };
 
         // Block until shutdown signal received
@@ -325,7 +325,10 @@ impl WebRTCP2PNetwork {
 
     /// Connect to a specific peer
     pub async fn connect_to_peer(&self, peer_id: String, peer_address: String) -> Result<()> {
-        info!("🔗 Attempting connection to peer {} at {}", peer_id, peer_address);
+        info!(
+            "🔗 Attempting connection to peer {} at {}",
+            peer_id, peer_address
+        );
 
         // Check if already connected
         {
@@ -337,7 +340,9 @@ impl WebRTCP2PNetwork {
         }
 
         // Create ICE servers configuration
-        let ice_servers = self.config.stun_servers
+        let ice_servers = self
+            .config
+            .stun_servers
             .iter()
             .map(|server| RTCIceServer {
                 urls: vec![server.clone()],
@@ -356,7 +361,7 @@ impl WebRTCP2PNetwork {
             self.webrtc_api
                 .new_peer_connection(rtc_config)
                 .await
-                .context("Failed to create peer connection")?
+                .context("Failed to create peer connection")?,
         );
 
         // Create peer connection wrapper
@@ -369,8 +374,14 @@ impl WebRTCP2PNetwork {
                 id: peer_id.clone(),
                 node_id: self.config.node_id.clone(),
                 connection_state: "new".to_string(),
-                connected_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                last_seen: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                connected_at: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                last_seen: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
                 bytes_sent: 0,
                 bytes_received: 0,
                 latency_ms: None,
@@ -386,10 +397,8 @@ impl WebRTCP2PNetwork {
             .context("Failed to create data channel")?;
 
         // Configure data channel callbacks
-        self.setup_data_channel_callbacks(
-            Arc::clone(&peer_connection),
-            Arc::clone(&data_channel),
-        ).await?;
+        self.setup_data_channel_callbacks(Arc::clone(&peer_connection), Arc::clone(&data_channel))
+            .await?;
 
         // Store data channel reference
         {
@@ -398,7 +407,8 @@ impl WebRTCP2PNetwork {
         }
 
         // Set up peer connection callbacks
-        self.setup_peer_connection_callbacks(Arc::clone(&peer_connection)).await?;
+        self.setup_peer_connection_callbacks(Arc::clone(&peer_connection))
+            .await?;
 
         // Create offer
         let offer = rtc_peer
@@ -420,7 +430,10 @@ impl WebRTCP2PNetwork {
 
         // TODO: Implement signaling server to exchange SDP and ICE candidates
         // For now, this is a placeholder for the signaling mechanism
-        info!("📋 Created offer for peer {}, awaiting signaling implementation", peer_id);
+        info!(
+            "📋 Created offer for peer {}, awaiting signaling implementation",
+            peer_id
+        );
 
         // Update stats
         {
@@ -469,7 +482,10 @@ impl WebRTCP2PNetwork {
             }
         }
 
-        info!("📡 Broadcast complete: {} sent, {} errors", sent_count, error_count);
+        info!(
+            "📡 Broadcast complete: {} sent, {} errors",
+            sent_count, error_count
+        );
 
         // Update stats
         {
@@ -575,7 +591,7 @@ impl WebRTCP2PNetwork {
             let peer_id = peer_id_msg.clone();
             let message_tx = message_tx.clone();
             let peer_info = Arc::clone(&peer_info);
-            
+
             Box::pin(async move {
                 match Self::handle_incoming_message(&peer_id, msg, message_tx, peer_info).await {
                     Ok(_) => debug!("📨 Processed message from peer: {}", peer_id),
@@ -601,33 +617,37 @@ impl WebRTCP2PNetwork {
     }
 
     /// Set up peer connection event callbacks
-    async fn setup_peer_connection_callbacks(
-        &self,
-        peer: Arc<PeerConnection>,
-    ) -> Result<()> {
+    async fn setup_peer_connection_callbacks(&self, peer: Arc<PeerConnection>) -> Result<()> {
         let peer_id = peer.id.clone();
 
         // On connection state change
-        peer.rtc_peer.on_peer_connection_state_change(Box::new(move |state: RTCPeerConnectionState| {
-            let peer_id = peer_id.clone();
-            Box::pin(async move {
-                info!("🔄 Peer {} connection state changed: {:?}", peer_id, state);
-            })
-        }));
+        peer.rtc_peer.on_peer_connection_state_change(Box::new(
+            move |state: RTCPeerConnectionState| {
+                let peer_id = peer_id.clone();
+                Box::pin(async move {
+                    info!("🔄 Peer {} connection state changed: {:?}", peer_id, state);
+                })
+            },
+        ));
 
         // On ICE candidate
         let peer_id_ice = peer.id.clone();
-        peer.rtc_peer.on_ice_candidate(Box::new(move |candidate: Option<RTCIceCandidate>| {
-            let peer_id = peer_id_ice.clone();
-            Box::pin(async move {
-                if let Some(candidate) = candidate {
-                    debug!("🧊 ICE candidate for peer {}: {}", peer_id, candidate.to_string());
-                    // TODO: Send ICE candidate through signaling server
-                } else {
-                    debug!("🧊 ICE gathering complete for peer: {}", peer_id);
-                }
-            })
-        }));
+        peer.rtc_peer
+            .on_ice_candidate(Box::new(move |candidate: Option<RTCIceCandidate>| {
+                let peer_id = peer_id_ice.clone();
+                Box::pin(async move {
+                    if let Some(candidate) = candidate {
+                        debug!(
+                            "🧊 ICE candidate for peer {}: {}",
+                            peer_id,
+                            candidate.to_string()
+                        );
+                        // TODO: Send ICE candidate through signaling server
+                    } else {
+                        debug!("🧊 ICE gathering complete for peer: {}", peer_id);
+                    }
+                })
+            }));
 
         Ok(())
     }
@@ -643,12 +663,15 @@ impl WebRTCP2PNetwork {
         {
             let mut info = peer_info.lock().unwrap();
             info.bytes_received += msg.data.len() as u64;
-            info.last_seen = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            info.last_seen = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
         }
 
         // Deserialize message
-        let p2p_message: P2PMessage = bincode::deserialize(&msg.data)
-            .context("Failed to deserialize P2P message")?;
+        let p2p_message: P2PMessage =
+            bincode::deserialize(&msg.data).context("Failed to deserialize P2P message")?;
 
         debug!("📨 Received message from {}: {:?}", peer_id, p2p_message);
 
@@ -668,7 +691,7 @@ impl WebRTCP2PNetwork {
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(interval);
-            
+
             loop {
                 tokio::select! {
                     _ = interval_timer.tick() => {
@@ -707,7 +730,7 @@ impl WebRTCP2PNetwork {
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(Duration::from_secs(60));
-            
+
             loop {
                 tokio::select! {
                     _ = interval_timer.tick() => {
@@ -716,7 +739,7 @@ impl WebRTCP2PNetwork {
                         {
                             let peers = peers.read().await;
                             let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-                            
+
                             for (peer_id, peer) in peers.iter() {
                                 let info = peer.info.lock().unwrap();
                                 let last_seen_duration = now.saturating_sub(info.last_seen);
@@ -768,9 +791,9 @@ impl WebRTCP2PNetwork {
                         match result {
                             Ok((peer_id, message)) => {
                                 if let Err(e) = Self::process_received_message(
-                                    &peer_id, 
-                                    message, 
-                                    &peers, 
+                                    &peer_id,
+                                    message,
+                                    &peers,
                                     &stats
                                 ).await {
                                     warn!("❌ Error processing message from {}: {}", peer_id, e);
@@ -820,47 +843,102 @@ impl WebRTCP2PNetwork {
                     peer.handle_pong(timestamp, nonce);
                 }
             }
-            P2PMessage::Handshake { node_id, version, timestamp } => {
-                info!("🤝 Received handshake from peer {} (node: {}, version: {}, time: {})", 
-                      peer_id, node_id, version, timestamp);
+            P2PMessage::Handshake {
+                node_id,
+                version,
+                timestamp,
+            } => {
+                info!(
+                    "🤝 Received handshake from peer {} (node: {}, version: {}, time: {})",
+                    peer_id, node_id, version, timestamp
+                );
                 // Handshake received - peer is identified
             }
-            P2PMessage::Transaction { tx_hash, tx_data, timestamp } => {
-                info!("📥 Received transaction {} from peer {} (size: {} bytes, time: {})", 
-                      tx_hash, peer_id, tx_data.len(), timestamp);
+            P2PMessage::Transaction {
+                tx_hash,
+                tx_data,
+                timestamp,
+            } => {
+                info!(
+                    "📥 Received transaction {} from peer {} (size: {} bytes, time: {})",
+                    tx_hash,
+                    peer_id,
+                    tx_data.len(),
+                    timestamp
+                );
                 // Transaction received - forward to blockchain layer
             }
-            P2PMessage::Block { block_hash, block_data, block_number, timestamp } => {
-                info!("📦 Received block {} #{} from peer {} (size: {} bytes, time: {})", 
-                      block_hash, block_number, peer_id, block_data.len(), timestamp);
+            P2PMessage::Block {
+                block_hash,
+                block_data,
+                block_number,
+                timestamp,
+            } => {
+                info!(
+                    "📦 Received block {} #{} from peer {} (size: {} bytes, time: {})",
+                    block_hash,
+                    block_number,
+                    peer_id,
+                    block_data.len(),
+                    timestamp
+                );
                 // Block received - forward to blockchain layer
             }
-            P2PMessage::DataRequest { request_id, data_type, data_hash, timestamp } => {
-                info!("📤 Received data request {} for {:?} {} from peer {} (time: {})", 
-                      request_id, data_type, data_hash, peer_id, timestamp);
+            P2PMessage::DataRequest {
+                request_id,
+                data_type,
+                data_hash,
+                timestamp,
+            } => {
+                info!(
+                    "📤 Received data request {} for {:?} {} from peer {} (time: {})",
+                    request_id, data_type, data_hash, peer_id, timestamp
+                );
                 // Data request received - should respond with requested data
             }
-            P2PMessage::DataResponse { request_id, data, timestamp } => {
+            P2PMessage::DataResponse {
+                request_id,
+                data,
+                timestamp,
+            } => {
                 match data {
                     Some(data_bytes) => {
-                        info!("📥 Received data response {} from peer {} (size: {} bytes, time: {})", 
-                              request_id, peer_id, data_bytes.len(), timestamp);
+                        info!(
+                            "📥 Received data response {} from peer {} (size: {} bytes, time: {})",
+                            request_id,
+                            peer_id,
+                            data_bytes.len(),
+                            timestamp
+                        );
                     }
                     None => {
-                        info!("📥 Received empty data response {} from peer {} (time: {})", 
-                              request_id, peer_id, timestamp);
+                        info!(
+                            "📥 Received empty data response {} from peer {} (time: {})",
+                            request_id, peer_id, timestamp
+                        );
                     }
                 }
                 // Data response received
             }
-            P2PMessage::PeerAnnouncement { node_id, listen_addr, peer_list, timestamp } => {
+            P2PMessage::PeerAnnouncement {
+                node_id,
+                listen_addr,
+                peer_list,
+                timestamp,
+            } => {
                 info!("📢 Received peer announcement from {} (node: {}, addr: {}, peers: {}, time: {})", 
                       peer_id, node_id, listen_addr, peer_list.len(), timestamp);
                 // Peer announcement received - could connect to new peers
             }
-            P2PMessage::Error { error_code, message, timestamp } => {
-                warn!("❌ Received error message from peer {} (code: {}, msg: {}, time: {})", 
-                      peer_id, error_code, message, timestamp);
+            P2PMessage::Error {
+                error_code,
+                message,
+                timestamp,
+            } => {
+                warn!(
+                    "❌ Received error message from peer {} (code: {}, msg: {}, time: {})",
+                    peer_id, error_code, message, timestamp
+                );
                 // Error message received
             }
         }
@@ -876,17 +954,17 @@ impl P2PNetworkLayer for WebRTCP2PNetwork {
     async fn start(&self) -> Result<()> {
         self.start().await
     }
-    
+
     /// Connect to a specific peer
     async fn connect_to_peer(&self, peer_id: String, peer_address: String) -> Result<()> {
         self.connect_to_peer(peer_id, peer_address).await
     }
-    
+
     /// Send transaction to the network
     async fn broadcast_transaction(&self, tx: &UtxoTransaction) -> Result<()> {
         let tx_data = bincode::serialize(tx)
             .map_err(|e| anyhow::anyhow!("Failed to serialize transaction: {}", e))?;
-        
+
         let message = P2PMessage::Transaction {
             tx_hash: tx.hash.clone(),
             tx_data,
@@ -895,15 +973,15 @@ impl P2PNetworkLayer for WebRTCP2PNetwork {
                 .unwrap()
                 .as_secs(),
         };
-        
+
         self.broadcast_message(message).await
     }
-    
+
     /// Send block to the network
     async fn broadcast_block(&self, block: &UtxoBlock) -> Result<()> {
         let block_data = bincode::serialize(block)
             .map_err(|e| anyhow::anyhow!("Failed to serialize block: {}", e))?;
-        
+
         let message = P2PMessage::Block {
             block_hash: block.hash.clone(),
             block_data,
@@ -913,10 +991,10 @@ impl P2PNetworkLayer for WebRTCP2PNetwork {
                 .unwrap()
                 .as_secs(),
         };
-        
+
         self.broadcast_message(message).await
     }
-    
+
     /// Request data from peers
     async fn request_blockchain_data(&self, data_type: String, data_hash: Hash) -> Result<()> {
         let data_type_enum = match data_type.as_str() {
@@ -927,7 +1005,7 @@ impl P2PNetworkLayer for WebRTCP2PNetwork {
             "chain_metadata" => DataType::ChainMetadata,
             _ => return Err(anyhow::anyhow!("Unknown data type: {}", data_type)),
         };
-        
+
         let message = P2PMessage::DataRequest {
             request_id: uuid::Uuid::new_v4().to_string(),
             data_type: data_type_enum,
@@ -937,15 +1015,15 @@ impl P2PNetworkLayer for WebRTCP2PNetwork {
                 .unwrap()
                 .as_secs(),
         };
-        
+
         self.broadcast_message(message).await
     }
-    
+
     /// Get list of connected peers
     async fn get_connected_peers(&self) -> Vec<String> {
         WebRTCP2PNetwork::get_connected_peers(self).await
     }
-    
+
     /// Get peer information
     async fn get_peer_info(&self, peer_id: &str) -> Result<Option<String>> {
         match WebRTCP2PNetwork::get_peer_info(self, peer_id).await {
@@ -957,12 +1035,12 @@ impl P2PNetworkLayer for WebRTCP2PNetwork {
             None => Ok(None),
         }
     }
-    
+
     /// Disconnect from a specific peer
     async fn disconnect_peer(&self, peer_id: &str) -> Result<()> {
         WebRTCP2PNetwork::disconnect_peer(self, peer_id).await
     }
-    
+
     /// Shutdown the P2P network
     async fn shutdown(&self) -> Result<()> {
         WebRTCP2PNetwork::shutdown(self).await
@@ -973,7 +1051,7 @@ impl Clone for WebRTCP2PNetwork {
     fn clone(&self) -> Self {
         // Create a new receiver from the same sender
         let new_message_rx = self.message_tx.subscribe();
-        
+
         Self {
             config: self.config.clone(),
             peers: Arc::clone(&self.peers),

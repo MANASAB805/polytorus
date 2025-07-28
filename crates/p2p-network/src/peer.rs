@@ -5,19 +5,14 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use bytes::Bytes;
-use log::{info, warn, error, debug};
+use log::{debug, error, info, warn};
 use tokio::{
     sync::{broadcast, RwLock},
     time::timeout,
 };
-use webrtc::{
-    peer_connection::{
-        peer_connection_state::RTCPeerConnectionState,
-        RTCPeerConnection,
-    },
-};
+use webrtc::peer_connection::{peer_connection_state::RTCPeerConnectionState, RTCPeerConnection};
 
 use crate::{P2PMessage, PeerInfo};
 
@@ -33,8 +28,14 @@ impl super::PeerConnection {
             id: id.clone(),
             node_id: node_id.clone(),
             connection_state: "new".to_string(),
-            connected_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-            last_seen: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            connected_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            last_seen: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             bytes_sent: 0,
             bytes_received: 0,
             latency_ms: None,
@@ -55,20 +56,21 @@ impl super::PeerConnection {
     pub async fn send_message(&self, message: P2PMessage) -> Result<()> {
         let data_channel = {
             let dc_lock = self.data_channel.read().await;
-            dc_lock.as_ref()
+            dc_lock
+                .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("Data channel not available for peer: {}", self.id))?
                 .clone()
         };
 
         // Serialize message
-        let serialized = bincode::serialize(&message)
-            .context("Failed to serialize P2P message")?;
+        let serialized = bincode::serialize(&message).context("Failed to serialize P2P message")?;
 
         // Send message with timeout
         let send_result = timeout(
             std::time::Duration::from_secs(10),
-            data_channel.send(&Bytes::from(serialized.clone()))
-        ).await;
+            data_channel.send(&Bytes::from(serialized.clone())),
+        )
+        .await;
 
         match send_result {
             Ok(Ok(_)) => {
@@ -76,7 +78,10 @@ impl super::PeerConnection {
                 {
                     let mut info = self.info.lock().unwrap();
                     info.bytes_sent += serialized.len() as u64;
-                    info.last_seen = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+                    info.last_seen = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
                     // Increase reputation for successful sends
                     info.reputation_score = (info.reputation_score + 0.01).min(2.0);
                 }
@@ -144,16 +149,16 @@ impl super::PeerConnection {
     pub fn update_latency(&self, latency_ms: u64) {
         let mut info = self.info.lock().unwrap();
         info.latency_ms = Some(latency_ms);
-        
+
         // Adjust reputation based on latency
         let latency_factor = if latency_ms < 100 {
             1.05 // Good latency
         } else if latency_ms < 500 {
-            1.0  // Acceptable latency
+            1.0 // Acceptable latency
         } else {
             0.95 // Poor latency
         };
-        
+
         info.reputation_score = (info.reputation_score * latency_factor).min(2.0).max(0.0);
     }
 

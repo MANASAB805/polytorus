@@ -16,17 +16,17 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use traits::{
-    Address, ExecutionBatch, ExecutionLayer, ExecutionResult, Hash, Result, Transaction,
-    TransactionReceipt, AccountState, Event, ScriptExecutionContext, ScriptExecutionResult,
-    ScriptMetadata, ScriptTransactionType
-};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use traits::{
+    AccountState, Address, Event, ExecutionBatch, ExecutionLayer, ExecutionResult, Hash, Result,
+    ScriptExecutionContext, ScriptExecutionResult, ScriptMetadata, ScriptTransactionType,
+    Transaction, TransactionReceipt,
+};
 use wasmtime::{Engine, Linker, Module, Store};
 
-use crate::script_engine::{ScriptEngine, ScriptType, ScriptContext, BuiltInScript};
+use crate::script_engine::{BuiltInScript, ScriptContext, ScriptEngine, ScriptType};
 use crate::script_state::ScriptStateManager;
 
 /// Execution layer configuration
@@ -101,37 +101,48 @@ impl PolyTorusExecutionLayer {
     pub fn new(config: ExecutionConfig) -> Result<Self> {
         let engine = Engine::default();
         let mut linker = Linker::new(&engine);
-        
+
         // Create script engine
         let script_engine = Arc::new(ScriptEngine::new(config.clone())?);
-        
+
         // Create script state manager
         let script_state_manager = Arc::new(ScriptStateManager::new(
             1024 * 1024 * 10, // 10MB max state per script
-            100, // Keep 100 snapshots
+            100,              // Keep 100 snapshots
         ));
-        
+
         // Add host functions for blockchain operations
-        linker.func_wrap("env", "get_balance", |caller: wasmtime::Caller<'_, ExecutionStore>, addr: u32| -> u64 {
-            // Implement balance checking logic using store data
-            let store_data = caller.data();
-            if addr > 0 && store_data.gas_remaining > 0 {
-                1000 // Return balance based on address and available gas
-            } else {
-                0
-            }
-        })?;
-        
-        linker.func_wrap("env", "transfer", |caller: wasmtime::Caller<'_, ExecutionStore>, 
-                        from: u32, to: u32, amount: u64| -> i32 {
-            // Implement transfer logic using all parameters
-            let store_data = caller.data();
-            if from != to && amount > 0 && store_data.gas_remaining >= amount {
-                1 // Success
-            } else {
-                0 // Failure
-            }
-        })?;
+        linker.func_wrap(
+            "env",
+            "get_balance",
+            |caller: wasmtime::Caller<'_, ExecutionStore>, addr: u32| -> u64 {
+                // Implement balance checking logic using store data
+                let store_data = caller.data();
+                if addr > 0 && store_data.gas_remaining > 0 {
+                    1000 // Return balance based on address and available gas
+                } else {
+                    0
+                }
+            },
+        )?;
+
+        linker.func_wrap(
+            "env",
+            "transfer",
+            |caller: wasmtime::Caller<'_, ExecutionStore>,
+             from: u32,
+             to: u32,
+             amount: u64|
+             -> i32 {
+                // Implement transfer logic using all parameters
+                let store_data = caller.data();
+                if from != to && amount > 0 && store_data.gas_remaining >= amount {
+                    1 // Success
+                } else {
+                    0 // Failure
+                }
+            },
+        )?;
 
         Ok(Self {
             engine,
@@ -146,7 +157,12 @@ impl PolyTorusExecutionLayer {
     }
 
     /// Execute WASM contract using both script engine and direct WASM execution
-    fn execute_wasm_contract(&self, code: &[u8], input: &[u8], tx: &Transaction) -> Result<Vec<u8>> {
+    fn execute_wasm_contract(
+        &self,
+        code: &[u8],
+        input: &[u8],
+        tx: &Transaction,
+    ) -> Result<Vec<u8>> {
         // Try script engine first for advanced features
         if !code.is_empty() {
             let context = ScriptContext {
@@ -159,7 +175,7 @@ impl PolyTorusExecutionLayer {
                 receiver: tx.to.clone(),
                 value: tx.value,
             };
-            
+
             // Execute script
             let result = self.script_engine.execute_script(
                 &ScriptType::Wasm(code.to_vec()),
@@ -167,12 +183,12 @@ impl PolyTorusExecutionLayer {
                 &tx.signature,
                 self.account_states.clone(),
             )?;
-            
+
             if result.success {
                 return Ok(result.return_data);
             }
         }
-        
+
         // Fallback to direct WASM execution using the engine and linker
         let module = Module::new(&self.engine, code)?;
         let store_data = ExecutionStore {
@@ -181,7 +197,7 @@ impl PolyTorusExecutionLayer {
         };
         let mut store = Store::new(&self.engine, store_data);
         let instance = self.linker.instantiate(&mut store, &module)?;
-        
+
         // Get the main function
         let main_func = instance
             .get_typed_func::<(u32, u32), u32>(&mut store, "main")
@@ -189,16 +205,16 @@ impl PolyTorusExecutionLayer {
 
         // Update memory usage based on input size
         store.data_mut().memory_used += input.len() as u32;
-        
+
         // Call the function
         let result = main_func.call(&mut store, (input.as_ptr() as u32, input.len() as u32))?;
-        
+
         // Consume gas for execution
         let gas_consumed = 1000; // Base execution cost
         if store.data().gas_remaining >= gas_consumed {
             store.data_mut().gas_remaining -= gas_consumed;
         }
-        
+
         // Return result (simplified)
         Ok(vec![result as u8])
     }
@@ -217,7 +233,10 @@ impl PolyTorusExecutionLayer {
         // Handle script transactions
         if let Some(script_type) = &tx.script_type {
             match script_type {
-                ScriptTransactionType::Deploy { script_data, init_params } => {
+                ScriptTransactionType::Deploy {
+                    script_data,
+                    init_params,
+                } => {
                     // Deploy new script
                     // Use a simpler approach for script deployment in sync context
                     match self.script_state_manager.deploy_script(
@@ -239,7 +258,11 @@ impl PolyTorusExecutionLayer {
                         }
                     }
                 }
-                ScriptTransactionType::Call { script_hash, method: _, params } => {
+                ScriptTransactionType::Call {
+                    script_hash,
+                    method: _,
+                    params,
+                } => {
                     // Call script
                     let _context = ScriptExecutionContext {
                         tx_hash: tx.hash.clone(),
@@ -249,7 +272,7 @@ impl PolyTorusExecutionLayer {
                         block_height: 0, // Would be set from blockchain state
                         timestamp: chrono::Utc::now().timestamp() as u64,
                     };
-                    
+
                     // Execute script synchronously in transaction context
                     let script_context = ScriptContext {
                         tx_data: serde_json::to_vec(tx).unwrap_or_default(),
@@ -261,7 +284,7 @@ impl PolyTorusExecutionLayer {
                         receiver: Some(script_hash.clone()),
                         value: tx.value,
                     };
-                    
+
                     match self.script_state_manager.get_script(script_hash) {
                         Some(script_metadata) => {
                             match self.script_engine.execute_script(
@@ -293,7 +316,10 @@ impl PolyTorusExecutionLayer {
                         }
                     }
                 }
-                ScriptTransactionType::StateUpdate { script_hash, updates } => {
+                ScriptTransactionType::StateUpdate {
+                    script_hash,
+                    updates,
+                } => {
                     // Update script state
                     for (key, value) in updates {
                         if let Err(_) = self.script_state_manager.update_state(
@@ -343,17 +369,17 @@ impl PolyTorusExecutionLayer {
             gas_used,
             events,
         };
-        
+
         // Update execution context if active
         self.update_execution_context(&receipt, gas_used);
-        
+
         Ok(receipt)
     }
 
     /// Transfer funds between accounts
     fn transfer(&self, from: &Address, to: &Address, amount: u64) -> Result<()> {
         let mut states = self.account_states.lock().unwrap();
-        
+
         // Get or create from account
         let from_state = states.entry(from.clone()).or_insert(AccountState {
             balance: 10000, // Give initial balance for testing
@@ -386,20 +412,20 @@ impl PolyTorusExecutionLayer {
     fn calculate_state_root(&self) -> Hash {
         let states = self.account_states.lock().unwrap();
         let mut hasher = Sha256::new();
-        
+
         // Sort accounts for deterministic hash
         let mut sorted_accounts: Vec<_> = states.iter().collect();
         sorted_accounts.sort_by_key(|(addr, _)| *addr);
-        
+
         for (addr, state) in sorted_accounts {
             hasher.update(addr.as_bytes());
             hasher.update(state.balance.to_be_bytes());
             hasher.update(state.nonce.to_be_bytes());
         }
-        
+
         hex::encode(hasher.finalize())
     }
-    
+
     /// Update execution context with transaction receipt
     fn update_execution_context(&self, receipt: &TransactionReceipt, gas_used: u64) {
         if let Ok(mut context_guard) = self.execution_context.lock() {
@@ -420,7 +446,7 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
     async fn execute_batch(&mut self, transactions: Vec<Transaction>) -> Result<ExecutionBatch> {
         let batch_id = format!("batch_{}", uuid::Uuid::new_v4());
         let prev_state_root = self.get_state_root().await?;
-        
+
         let mut results = Vec::new();
         let mut all_receipts = Vec::new();
         let mut total_gas = 0;
@@ -490,16 +516,23 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
     async fn commit_execution(&mut self) -> Result<Hash> {
         let context = self.execution_context.lock().unwrap().take();
         if let Some(ctx) = context {
-            log::info!("Committing execution context: {} with {} transactions and {} gas used", 
-                      ctx.context_id, ctx.executed_txs.len(), ctx.gas_used);
-                      
+            log::info!(
+                "Committing execution context: {} with {} transactions and {} gas used",
+                ctx.context_id,
+                ctx.executed_txs.len(),
+                ctx.gas_used
+            );
+
             // Validate initial state matches
             let current_root = self.calculate_state_root();
             if current_root != ctx.initial_state_root {
-                log::warn!("State root mismatch during commit: expected {}, got {}", 
-                          ctx.initial_state_root, current_root);
+                log::warn!(
+                    "State root mismatch during commit: expected {}, got {}",
+                    ctx.initial_state_root,
+                    current_root
+                );
             }
-            
+
             // Apply pending changes
             let mut states = self.account_states.lock().unwrap();
             for (addr, state) in ctx.pending_changes {
@@ -517,25 +550,33 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
         *self.execution_context.lock().unwrap() = None;
         Ok(())
     }
-    
-    async fn deploy_script(&mut self, owner: &Address, script_data: &[u8], init_params: &[u8]) -> Result<Hash> {
+
+    async fn deploy_script(
+        &mut self,
+        owner: &Address,
+        script_data: &[u8],
+        init_params: &[u8],
+    ) -> Result<Hash> {
         // Validate script
         self.script_engine.validate_script(script_data)?;
-        
+
         // Deploy script with state manager
         let script_type = if script_data.is_empty() {
             ScriptType::BuiltIn(BuiltInScript::PayToPublicKey)
         } else {
             ScriptType::Wasm(script_data.to_vec())
         };
-        
+
         let script_hash = self.script_state_manager.deploy_script(
             owner.clone(),
             script_type,
             script_data.to_vec(),
-            Some(format!("Script deployed with {} bytes init params", init_params.len())),
+            Some(format!(
+                "Script deployed with {} bytes init params",
+                init_params.len()
+            )),
         )?;
-        
+
         // If init params provided, execute initialization
         if !init_params.is_empty() {
             let context = ScriptContext {
@@ -548,10 +589,12 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
                 receiver: None,
                 value: 0,
             };
-            
-            let script_metadata = self.script_state_manager.get_script(&script_hash)
+
+            let script_metadata = self
+                .script_state_manager
+                .get_script(&script_hash)
                 .ok_or_else(|| anyhow::anyhow!("Script not found after deployment"))?;
-                
+
             self.script_engine.execute_script(
                 &script_metadata.script_type,
                 context,
@@ -559,19 +602,27 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
                 self.account_states.clone(),
             )?;
         }
-        
+
         Ok(script_hash)
     }
-    
-    async fn execute_script(&mut self, script_hash: &Hash, method: &str, params: &[u8], context: ScriptExecutionContext) -> Result<ScriptExecutionResult> {
+
+    async fn execute_script(
+        &mut self,
+        script_hash: &Hash,
+        method: &str,
+        params: &[u8],
+        context: ScriptExecutionContext,
+    ) -> Result<ScriptExecutionResult> {
         // Get script metadata
-        let script_metadata = self.script_state_manager.get_script(script_hash)
+        let script_metadata = self
+            .script_state_manager
+            .get_script(script_hash)
             .ok_or_else(|| anyhow::anyhow!("Script not found: {}", script_hash))?;
-            
+
         if !script_metadata.active {
             return Err(anyhow::anyhow!("Script is not active: {}", script_hash));
         }
-        
+
         // Create script context
         let script_context = ScriptContext {
             tx_data: method.as_bytes().to_vec(),
@@ -583,7 +634,7 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
             receiver: Some(script_hash.clone()),
             value: context.value,
         };
-        
+
         // Execute script
         let result = self.script_engine.execute_script(
             &script_metadata.script_type,
@@ -591,7 +642,7 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
             &[],
             self.account_states.clone(),
         )?;
-        
+
         // Apply state changes
         for (key, value) in &result.state_changes {
             self.script_state_manager.update_state(
@@ -601,7 +652,7 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
                 &context.tx_hash,
             )?;
         }
-        
+
         // Convert to trait result
         Ok(ScriptExecutionResult {
             success: result.success,
@@ -612,16 +663,19 @@ impl ExecutionLayer for PolyTorusExecutionLayer {
             events: vec![],
         })
     }
-    
+
     async fn get_script_metadata(&self, script_hash: &Hash) -> Result<Option<ScriptMetadata>> {
-        Ok(self.script_state_manager.get_script(script_hash).map(|meta| ScriptMetadata {
-            script_hash: meta.script_hash,
-            owner: meta.owner,
-            deployed_at: meta.deployed_at,
-            code_size: meta.bytecode.len(),
-            version: meta.version,
-            active: meta.active,
-        }))
+        Ok(self
+            .script_state_manager
+            .get_script(script_hash)
+            .map(|meta| ScriptMetadata {
+                script_hash: meta.script_hash,
+                owner: meta.owner,
+                deployed_at: meta.deployed_at,
+                code_size: meta.bytecode.len(),
+                version: meta.version,
+                active: meta.active,
+            }))
     }
 }
 
@@ -630,7 +684,7 @@ impl PolyTorusExecutionLayer {
     pub fn list_builtin_scripts(&self) -> Vec<String> {
         self.script_engine.list_builtin_scripts()
     }
-    
+
     /// Get execution layer statistics
     pub fn get_execution_stats(&self) -> ExecutionStats {
         ExecutionStats {
@@ -640,7 +694,7 @@ impl PolyTorusExecutionLayer {
             memory_usage: self.get_memory_usage(),
         }
     }
-    
+
     /// Get current memory usage estimate
     fn get_memory_usage(&self) -> u64 {
         // Simple estimate based on cache and state size
@@ -739,19 +793,22 @@ mod tests {
         let state_root = layer.commit_execution().await.unwrap();
         assert!(!state_root.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_script_deployment_and_execution() {
         let config = ExecutionConfig::default();
         let mut layer = PolyTorusExecutionLayer::new(config).unwrap();
 
         // Deploy a simple script
-        let script_hash = layer.script_state_manager.deploy_script(
-            "alice".to_string(),
-            ScriptType::BuiltIn(BuiltInScript::PayToPublicKey),
-            vec![],
-            Some("Test payment script".to_string()),
-        ).unwrap();
+        let script_hash = layer
+            .script_state_manager
+            .deploy_script(
+                "alice".to_string(),
+                ScriptType::BuiltIn(BuiltInScript::PayToPublicKey),
+                vec![],
+                Some("Test payment script".to_string()),
+            )
+            .unwrap();
 
         // Create transaction with script reference
         let tx = Transaction {
@@ -782,39 +839,57 @@ mod tests {
         let layer = PolyTorusExecutionLayer::new(config).unwrap();
 
         // Deploy script
-        let script_hash = layer.script_state_manager.deploy_script(
-            "alice".to_string(),
-            ScriptType::BuiltIn(BuiltInScript::HashLock("test_hash".to_string())),
-            vec![],
-            None,
-        ).unwrap();
+        let script_hash = layer
+            .script_state_manager
+            .deploy_script(
+                "alice".to_string(),
+                ScriptType::BuiltIn(BuiltInScript::HashLock("test_hash".to_string())),
+                vec![],
+                None,
+            )
+            .unwrap();
 
         // Update script state
-        layer.script_state_manager.update_state(
-            &script_hash,
-            b"counter".to_vec(),
-            b"42".to_vec(),
-            &"tx1".to_string(),
-        ).unwrap();
+        layer
+            .script_state_manager
+            .update_state(
+                &script_hash,
+                b"counter".to_vec(),
+                b"42".to_vec(),
+                &"tx1".to_string(),
+            )
+            .unwrap();
 
         // Verify state
-        let value = layer.script_state_manager.get_state(&script_hash, b"counter").unwrap();
+        let value = layer
+            .script_state_manager
+            .get_state(&script_hash, b"counter")
+            .unwrap();
         assert_eq!(value, b"42");
 
         // Create snapshot
         let snapshot_id = layer.script_state_manager.create_snapshot(100).unwrap();
 
         // Modify state
-        layer.script_state_manager.update_state(
-            &script_hash,
-            b"counter".to_vec(),
-            b"84".to_vec(),
-            &"tx2".to_string(),
-        ).unwrap();
+        layer
+            .script_state_manager
+            .update_state(
+                &script_hash,
+                b"counter".to_vec(),
+                b"84".to_vec(),
+                &"tx2".to_string(),
+            )
+            .unwrap();
 
         // Rollback
-        layer.script_state_manager.rollback_to_snapshot(&snapshot_id).unwrap();
-        let value = layer.script_state_manager.get_state(&script_hash, b"counter").unwrap();
+        layer
+            .script_state_manager
+            .rollback_to_snapshot(&snapshot_id)
+            .unwrap();
+        let value = layer
+            .script_state_manager
+            .get_state(&script_hash, b"counter")
+            .unwrap();
         assert_eq!(value, b"42");
     }
 
@@ -866,12 +941,15 @@ mod tests {
         let mut layer = PolyTorusExecutionLayer::new(config).unwrap();
 
         // Deploy multi-sig script (2 of 3)
-        let script_hash = layer.script_state_manager.deploy_script(
-            "alice".to_string(),
-            ScriptType::BuiltIn(BuiltInScript::MultiSig(2, 3)),
-            vec![],
-            Some("2-of-3 multisig".to_string()),
-        ).unwrap();
+        let script_hash = layer
+            .script_state_manager
+            .deploy_script(
+                "alice".to_string(),
+                ScriptType::BuiltIn(BuiltInScript::MultiSig(2, 3)),
+                vec![],
+                Some("2-of-3 multisig".to_string()),
+            )
+            .unwrap();
 
         // Create transaction with 2 signatures
         let tx = Transaction {
@@ -901,14 +979,17 @@ mod tests {
         let mut layer = PolyTorusExecutionLayer::new(config).unwrap();
 
         let current_time = chrono::Utc::now().timestamp() as u64;
-        
+
         // Deploy time lock script (unlocks in the past)
-        let script_hash = layer.script_state_manager.deploy_script(
-            "alice".to_string(),
-            ScriptType::BuiltIn(BuiltInScript::TimeLock(current_time - 3600)), // 1 hour ago
-            vec![],
-            Some("Time lock script".to_string()),
-        ).unwrap();
+        let script_hash = layer
+            .script_state_manager
+            .deploy_script(
+                "alice".to_string(),
+                ScriptType::BuiltIn(BuiltInScript::TimeLock(current_time - 3600)), // 1 hour ago
+                vec![],
+                Some("Time lock script".to_string()),
+            )
+            .unwrap();
 
         let tx = Transaction {
             hash: "timelock_tx".to_string(),

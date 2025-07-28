@@ -11,12 +11,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use traits::{
-    Hash, Result, UtxoConsensusLayer, UtxoBlock, UtxoTransaction, ValidatorInfo
-};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use traits::{Hash, Result, UtxoBlock, UtxoConsensusLayer, UtxoTransaction, ValidatorInfo};
 
 /// eUTXO consensus layer configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,10 +79,10 @@ impl PolyTorusUtxoConsensusLayer {
 
         let genesis_block = Self::create_genesis_utxo_block(genesis_time);
         let genesis_hash = genesis_block.hash.clone();
-        
+
         let mut blocks = HashMap::new();
         blocks.insert(genesis_hash.clone(), genesis_block);
-        
+
         let chain_state = UtxoChainState {
             canonical_chain: vec![genesis_hash],
             blocks,
@@ -103,10 +101,13 @@ impl PolyTorusUtxoConsensusLayer {
     }
 
     /// Create new eUTXO consensus layer as validator
-    pub fn new_as_validator(config: UtxoConsensusConfig, validator_address: String) -> Result<Self> {
+    pub fn new_as_validator(
+        config: UtxoConsensusConfig,
+        validator_address: String,
+    ) -> Result<Self> {
         let mut layer = Self::new(config)?;
         layer.validator_address = Some(validator_address.clone());
-        
+
         // Add self as validator
         let validator_info = ValidatorInfo {
             address: validator_address,
@@ -114,12 +115,12 @@ impl PolyTorusUtxoConsensusLayer {
             public_key: vec![1, 2, 3],
             active: true,
         };
-        
+
         {
             let mut validators = layer.validators.lock().unwrap();
             validators.insert(validator_info.address.clone(), validator_info);
         }
-        
+
         Ok(layer)
     }
 
@@ -192,30 +193,44 @@ impl PolyTorusUtxoConsensusLayer {
             block.hash = self.calculate_utxo_block_hash(&block);
             return Ok(block);
         }
-        
+
         let mut nonce = 0u64;
         let required_zeros = "0".repeat(self.config.difficulty);
-        
+
         loop {
             block.proof = nonce.to_be_bytes().to_vec();
             let hash = self.calculate_utxo_block_hash(&block);
-            
+
             if hash.starts_with(&required_zeros) {
                 block.hash = hash;
-                log::info!("Successfully mined eUTXO block with nonce {} after {} attempts", nonce, nonce + 1);
+                log::info!(
+                    "Successfully mined eUTXO block with nonce {} after {} attempts",
+                    nonce,
+                    nonce + 1
+                );
                 return Ok(block);
             }
-            
+
             nonce += 1;
-            
+
             if nonce % 100_000 == 0 {
-                log::info!("Mining attempt {}: hash = {}, required = {} zeros", nonce, &hash[0..10.min(hash.len())], self.config.difficulty);
+                log::info!(
+                    "Mining attempt {}: hash = {}, required = {} zeros",
+                    nonce,
+                    &hash[0..10.min(hash.len())],
+                    self.config.difficulty
+                );
             }
-            
+
             if nonce > 10_000_000 {
-                log::error!("Mining failed after 10M attempts. Difficulty: {}, Last hash: {}", 
-                           self.config.difficulty, &hash[0..10.min(hash.len())]);
-                return Err(anyhow::anyhow!("Failed to mine eUTXO block after 10M attempts"));
+                log::error!(
+                    "Mining failed after 10M attempts. Difficulty: {}, Last hash: {}",
+                    self.config.difficulty,
+                    &hash[0..10.min(hash.len())]
+                );
+                return Err(anyhow::anyhow!(
+                    "Failed to mine eUTXO block after 10M attempts"
+                ));
             }
         }
     }
@@ -234,21 +249,29 @@ impl PolyTorusUtxoConsensusLayer {
 
         // Validate slot timing (relaxed for testing)
         let expected_slot = self.timestamp_to_slot(block.timestamp);
-        if self.config.slot_time > 500 && block.slot != expected_slot {  // Only strict timing for production (slot_time > 500ms)
-            log::warn!("Invalid slot timing: block slot={}, expected={}, timestamp={}", 
-                      block.slot, expected_slot, block.timestamp);
+        if self.config.slot_time > 500 && block.slot != expected_slot {
+            // Only strict timing for production (slot_time > 500ms)
+            log::warn!(
+                "Invalid slot timing: block slot={}, expected={}, timestamp={}",
+                block.slot,
+                expected_slot,
+                block.timestamp
+            );
             return false;
         }
         // For fast testing (slot_time <= 500ms), allow any slot progression
-        log::info!("Slot timing validation: block slot={}, expected={} (relaxed for testing)", 
-                  block.slot, expected_slot);
+        log::info!(
+            "Slot timing validation: block slot={}, expected={} (relaxed for testing)",
+            block.slot,
+            expected_slot
+        );
 
         // Check timestamp is reasonable (not too far in future)
         let current_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        
+
         if block.timestamp > current_time + (5 * self.config.slot_time) {
             return false;
         }
@@ -268,8 +291,10 @@ impl PolyTorusUtxoConsensusLayer {
     pub fn get_pending_utxo_transactions(&self, limit: usize) -> Vec<UtxoTransaction> {
         let mut state = self.chain_state.lock().unwrap();
         let len = state.pending_transactions.len();
-        
-        state.pending_transactions.split_off(len.saturating_sub(limit))
+
+        state
+            .pending_transactions
+            .split_off(len.saturating_sub(limit))
     }
 
     /// Calculate transaction root for eUTXO transactions
@@ -296,7 +321,7 @@ impl UtxoConsensusLayer for PolyTorusUtxoConsensusLayer {
 
     async fn validate_utxo_block(&self, block: &UtxoBlock) -> Result<bool> {
         log::info!("Validating UTXO block: {}", block.hash);
-        
+
         // Validate block structure
         log::info!("Checking block structure...");
         if !self.validate_utxo_block_structure(block) {
@@ -316,17 +341,33 @@ impl UtxoConsensusLayer for PolyTorusUtxoConsensusLayer {
 
         // Validate block number sequence
         let parent_block = state.blocks.get(&block.parent_hash).unwrap();
-        log::info!("Checking block number sequence: block={}, parent={}", block.number, parent_block.number);
+        log::info!(
+            "Checking block number sequence: block={}, parent={}",
+            block.number,
+            parent_block.number
+        );
         if block.number != parent_block.number + 1 {
-            log::error!("Block number sequence invalid: expected {}, got {}", parent_block.number + 1, block.number);
+            log::error!(
+                "Block number sequence invalid: expected {}, got {}",
+                parent_block.number + 1,
+                block.number
+            );
             return Ok(false);
         }
         log::info!("Block number sequence valid");
 
         // Validate slot progression
-        log::info!("Checking slot progression: block={}, parent={}", block.slot, parent_block.slot);
+        log::info!(
+            "Checking slot progression: block={}, parent={}",
+            block.slot,
+            parent_block.slot
+        );
         if block.slot <= parent_block.slot {
-            log::error!("Slot progression invalid: block slot {} <= parent slot {}", block.slot, parent_block.slot);
+            log::error!(
+                "Slot progression invalid: block slot {} <= parent slot {}",
+                block.slot,
+                parent_block.slot
+            );
             return Ok(false);
         }
         log::info!("Slot progression valid");
@@ -357,20 +398,24 @@ impl UtxoConsensusLayer for PolyTorusUtxoConsensusLayer {
 
     async fn add_utxo_block(&mut self, block: UtxoBlock) -> Result<()> {
         let block_hash = block.hash.clone();
-        
+
         {
             let mut state = self.chain_state.lock().unwrap();
-            
+
             // Add block to storage
             state.blocks.insert(block_hash.clone(), block.clone());
-            
+
             // Update canonical chain
             state.canonical_chain.push(block_hash);
             state.height = block.number;
             state.current_slot = block.slot;
         }
 
-        log::info!("Added eUTXO block #{} (slot {}) to chain", block.number, block.slot);
+        log::info!(
+            "Added eUTXO block #{} (slot {}) to chain",
+            block.number,
+            block.slot
+        );
         Ok(())
     }
 
@@ -384,20 +429,33 @@ impl UtxoConsensusLayer for PolyTorusUtxoConsensusLayer {
     }
 
     async fn mine_utxo_block(&mut self, transactions: Vec<UtxoTransaction>) -> Result<UtxoBlock> {
-        log::info!("Starting UTXO block mining with {} transactions", transactions.len());
-        
+        log::info!(
+            "Starting UTXO block mining with {} transactions",
+            transactions.len()
+        );
+
         let state = self.chain_state.lock().unwrap();
-        let parent_hash = state.canonical_chain.last()
+        let parent_hash = state
+            .canonical_chain
+            .last()
             .cloned()
             .unwrap_or_else(|| "genesis_utxo_block_hash".to_string());
         let block_number = state.height + 1;
         let current_slot = std::cmp::max(state.current_slot + 1, self.get_current_slot_from_time());
-        log::info!("Block template: parent={}, number={}, slot={} (parent slot: {})", 
-                  parent_hash, block_number, current_slot, state.current_slot);
+        log::info!(
+            "Block template: parent={}, number={}, slot={} (parent slot: {})",
+            parent_hash,
+            block_number,
+            current_slot,
+            state.current_slot
+        );
         drop(state);
 
         // Calculate transaction root
-        log::info!("Calculating transaction root for {} transactions", transactions.len());
+        log::info!(
+            "Calculating transaction root for {} transactions",
+            transactions.len()
+        );
         let transaction_root = self.calculate_transaction_root(&transactions);
         log::info!("Transaction root calculated: {}", transaction_root);
 
@@ -414,17 +472,27 @@ impl UtxoConsensusLayer for PolyTorusUtxoConsensusLayer {
             transactions,
             utxo_set_hash: "pending_utxo_set_hash".to_string(), // Would be calculated from execution
             transaction_root,
-            validator: self.validator_address.clone().unwrap_or_else(|| "miner".to_string()),
+            validator: self
+                .validator_address
+                .clone()
+                .unwrap_or_else(|| "miner".to_string()),
             proof: vec![],
         };
 
         // Mine the block using PoW
-        log::info!("Starting PoW mining with difficulty: {}", self.config.difficulty);
+        log::info!(
+            "Starting PoW mining with difficulty: {}",
+            self.config.difficulty
+        );
         block = self.mine_proof_of_work(block)?;
         log::info!("PoW mining completed for block: {}", block.hash);
-        
-        log::info!("Successfully mined eUTXO block #{} (slot {}) with hash: {}", 
-                  block.number, block.slot, block.hash);
+
+        log::info!(
+            "Successfully mined eUTXO block #{} (slot {}) with hash: {}",
+            block.number,
+            block.slot,
+            block.hash
+        );
         Ok(block)
     }
 
@@ -433,7 +501,11 @@ impl UtxoConsensusLayer for PolyTorusUtxoConsensusLayer {
     }
 
     async fn set_difficulty(&mut self, difficulty: usize) -> Result<()> {
-        log::info!("Updating eUTXO consensus difficulty from {} to {}", self.config.difficulty, difficulty);
+        log::info!(
+            "Updating eUTXO consensus difficulty from {} to {}",
+            self.config.difficulty,
+            difficulty
+        );
         self.config.difficulty = difficulty;
         Ok(())
     }
@@ -441,16 +513,16 @@ impl UtxoConsensusLayer for PolyTorusUtxoConsensusLayer {
     async fn validate_slot_timing(&self, slot: u64, timestamp: u64) -> Result<bool> {
         let expected_timestamp = self.slot_to_timestamp(slot);
         let tolerance = self.config.slot_time / 2; // Allow 50% tolerance
-        
-        Ok(timestamp >= expected_timestamp.saturating_sub(tolerance) &&
-           timestamp <= expected_timestamp + tolerance)
+
+        Ok(timestamp >= expected_timestamp.saturating_sub(tolerance)
+            && timestamp <= expected_timestamp + tolerance)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use traits::{UtxoId, TxInput, TxOutput};
+    use traits::{TxInput, TxOutput, UtxoId};
 
     #[test]
     fn test_utxo_consensus_layer_creation() {
@@ -466,17 +538,17 @@ mod tests {
             ..UtxoConsensusConfig::default()
         };
         let layer = PolyTorusUtxoConsensusLayer::new(config).unwrap();
-        
+
         let genesis_time = layer.genesis_time;
         let slot_0_time = layer.slot_to_timestamp(0);
         let slot_1_time = layer.slot_to_timestamp(1);
-        
+
         assert_eq!(slot_0_time, genesis_time);
         assert_eq!(slot_1_time, genesis_time + 1000);
-        
+
         let calculated_slot_0 = layer.timestamp_to_slot(genesis_time);
         let calculated_slot_1 = layer.timestamp_to_slot(genesis_time + 1000);
-        
+
         assert_eq!(calculated_slot_0, 0);
         assert_eq!(calculated_slot_1, 1);
     }
@@ -490,11 +562,10 @@ mod tests {
                 difficulty: 0, // No difficulty for faster testing
                 ..UtxoConsensusConfig::default()
             };
-            let mut layer = PolyTorusUtxoConsensusLayer::new_as_validator(
-                config, 
-                "utxo_miner_1".to_string()
-            ).unwrap();
-            
+            let mut layer =
+                PolyTorusUtxoConsensusLayer::new_as_validator(config, "utxo_miner_1".to_string())
+                    .unwrap();
+
             let transaction = UtxoTransaction {
                 hash: "test_utxo_tx".to_string(),
                 inputs: vec![TxInput {
@@ -516,15 +587,15 @@ mod tests {
                 script_witness: vec![],
                 auxiliary_data: None,
             };
-            
+
             let block = layer.mine_utxo_block(vec![transaction]).await.unwrap();
-            
+
             // Verify the block was mined correctly
             assert!(!block.hash.is_empty());
             assert_eq!(block.number, 1);
             assert_eq!(block.transactions.len(), 1);
             assert!(!block.proof.is_empty());
-            
+
             // Verify PoW validation
             assert!(layer.validate_proof_of_work(&block));
         });
@@ -539,16 +610,17 @@ mod tests {
                 ..UtxoConsensusConfig::default()
             };
             let layer = PolyTorusUtxoConsensusLayer::new(config).unwrap();
-            
+
             let genesis_hash = layer.get_canonical_chain().await.unwrap()[0].clone();
-            
+
             // Use a future timestamp to ensure slot progression
             let current_time = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_millis() as u64 + 2000; // Add 2 seconds
+                .as_millis() as u64
+                + 2000; // Add 2 seconds
             let current_slot = layer.timestamp_to_slot(current_time);
-            
+
             let mut block = UtxoBlock {
                 hash: String::new(), // Will be calculated properly
                 parent_hash: genesis_hash,
@@ -561,10 +633,10 @@ mod tests {
                 validator: "test_validator".to_string(),
                 proof: vec![0, 0, 0, 0], // Valid proof for difficulty 0
             };
-            
+
             // Calculate the proper hash for the block
             block.hash = layer.calculate_utxo_block_hash(&block);
-            
+
             // Should pass validation with difficulty 0
             let is_valid = layer.validate_utxo_block(&block).await.unwrap();
             assert!(is_valid);

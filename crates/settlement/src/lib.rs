@@ -12,20 +12,20 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use traits::{
-    Address, ExecutionBatch, Hash, Result, SettlementLayer, SettlementResult, 
-    SettlementChallenge, FraudProof, ChallengeResult
-};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use traits::{
+    Address, ChallengeResult, ExecutionBatch, FraudProof, Hash, Result, SettlementChallenge,
+    SettlementLayer, SettlementResult,
+};
 
 /// Settlement layer configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettlementConfig {
     /// Challenge period in blocks
     pub challenge_period: u64,
-    /// Settlement batch size 
+    /// Settlement batch size
     pub batch_size: usize,
     /// Minimum validator stake
     pub min_validator_stake: u64,
@@ -106,11 +106,11 @@ impl PolyTorusSettlementLayer {
     fn verify_fraud_proof(&self, proof: &FraudProof, batch: &ExecutionBatch) -> Result<bool> {
         // In a real implementation, this would re-execute the batch
         // and compare the state roots to validate the fraud proof
-        
+
         // Simulate fraud proof verification
         if proof.expected_state_root != proof.actual_state_root {
             // State roots differ, fraud proof might be valid
-            
+
             // Check if the proof data is valid (simplified check)
             if !proof.proof_data.is_empty() && proof.batch_id == batch.batch_id {
                 // Verify the execution was actually incorrect
@@ -118,7 +118,7 @@ impl PolyTorusSettlementLayer {
                 return Ok(true);
             }
         }
-        
+
         Ok(false)
     }
 
@@ -129,13 +129,13 @@ impl PolyTorusSettlementLayer {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         let mut results = Vec::new();
         let mut expired_challenges = Vec::new();
 
         for (challenge_id, active_challenge) in challenges.iter_mut() {
             let challenge_duration = current_time - active_challenge.start_time;
-            
+
             // Challenge period expired (convert blocks to seconds for simplicity)
             if challenge_duration > self.config.challenge_period * 10 {
                 let result = match &active_challenge.status {
@@ -155,7 +155,7 @@ impl PolyTorusSettlementLayer {
                         }
                     }
                 };
-                
+
                 results.push(result);
                 expired_challenges.push(challenge_id.clone());
             }
@@ -173,17 +173,17 @@ impl PolyTorusSettlementLayer {
     pub fn finalize_unchallenged_batches(&self) -> Result<Vec<SettlementResult>> {
         let mut state = self.settlement_state.lock().unwrap();
         let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)  
+            .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
+
         let mut finalized = Vec::new();
         let mut batches_to_settle = Vec::new();
 
         // Collect batches to finalize
         for (batch_id, pending_batch) in &state.pending_batches {
             let time_elapsed = current_time - pending_batch.submission_time;
-            
+
             // If challenge period expired and not challenged, finalize
             if time_elapsed > self.config.challenge_period * 10 && !pending_batch.challenged {
                 let settlement_result = SettlementResult {
@@ -191,7 +191,7 @@ impl PolyTorusSettlementLayer {
                     settled_batches: vec![batch_id.clone()],
                     timestamp: current_time,
                 };
-                
+
                 finalized.push(settlement_result.clone());
                 batches_to_settle.push((batch_id.clone(), settlement_result));
             }
@@ -199,7 +199,9 @@ impl PolyTorusSettlementLayer {
 
         // Apply finalized batches
         for (batch_id, settlement_result) in batches_to_settle.iter() {
-            state.settled_batches.insert(batch_id.clone(), settlement_result.clone());
+            state
+                .settled_batches
+                .insert(batch_id.clone(), settlement_result.clone());
             state.settlement_history.push(settlement_result.clone());
         }
 
@@ -228,16 +230,16 @@ impl PolyTorusSettlementLayer {
     /// Calculate current settlement root from all settled batches
     pub fn calculate_current_settlement_root(&self, state: &SettlementState) -> Hash {
         let mut hasher = Sha256::new();
-        
+
         // Sort settled batches for deterministic hash
         let mut sorted_batches: Vec<_> = state.settled_batches.iter().collect();
         sorted_batches.sort_by_key(|(batch_id, _)| *batch_id);
-        
+
         for (batch_id, result) in sorted_batches {
             hasher.update(batch_id);
             hasher.update(&result.settlement_root);
         }
-        
+
         hex::encode(hasher.finalize())
     }
 }
@@ -257,12 +259,18 @@ impl SettlementLayer for PolyTorusSettlementLayer {
             submitter: "validator_address".to_string(), // Would be actual validator
             challenged: false,
         };
-        
-        log::info!("Settling batch {} submitted by {}", batch.batch_id, pending_batch.submitter);
+
+        log::info!(
+            "Settling batch {} submitted by {}",
+            batch.batch_id,
+            pending_batch.submitter
+        );
 
         {
             let mut state = self.settlement_state.lock().unwrap();
-            state.pending_batches.insert(batch.batch_id.clone(), pending_batch);
+            state
+                .pending_batches
+                .insert(batch.batch_id.clone(), pending_batch);
         }
 
         // Return pending settlement result
@@ -304,18 +312,19 @@ impl SettlementLayer for PolyTorusSettlementLayer {
 
     async fn process_challenge(&mut self, challenge_id: &Hash) -> Result<ChallengeResult> {
         let mut challenges = self.challenges.lock().unwrap();
-        
+
         if let Some(active_challenge) = challenges.get_mut(challenge_id) {
             active_challenge.status = ChallengeStatus::UnderReview;
 
             // Get the disputed batch
             let state = self.settlement_state.lock().unwrap();
-            if let Some(pending_batch) = state.pending_batches.get(&active_challenge.challenge.batch_id) {
+            if let Some(pending_batch) = state
+                .pending_batches
+                .get(&active_challenge.challenge.batch_id)
+            {
                 // Verify the fraud proof
-                let is_valid = self.verify_fraud_proof(
-                    &active_challenge.challenge.proof,
-                    &pending_batch.batch,
-                )?;
+                let is_valid = self
+                    .verify_fraud_proof(&active_challenge.challenge.proof, &pending_batch.batch)?;
 
                 let current_time = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -325,7 +334,11 @@ impl SettlementLayer for PolyTorusSettlementLayer {
                 let result = ChallengeResult {
                     challenge_id: challenge_id.clone(),
                     successful: is_valid,
-                    penalty: if is_valid { Some(self.config.min_validator_stake) } else { None },
+                    penalty: if is_valid {
+                        Some(self.config.min_validator_stake)
+                    } else {
+                        None
+                    },
                     timestamp: current_time,
                 };
 
@@ -345,7 +358,7 @@ impl SettlementLayer for PolyTorusSettlementLayer {
     async fn get_settlement_history(&self, limit: usize) -> Result<Vec<SettlementResult>> {
         let state = self.settlement_state.lock().unwrap();
         let history = state.settlement_history.clone();
-        
+
         Ok(if history.len() <= limit {
             history
         } else {
@@ -357,7 +370,7 @@ impl SettlementLayer for PolyTorusSettlementLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use traits::{ExecutionResult};
+    use traits::ExecutionResult;
 
     fn create_test_batch() -> ExecutionBatch {
         ExecutionBatch {
@@ -386,10 +399,10 @@ mod tests {
     async fn test_batch_settlement() {
         let config = SettlementConfig::default();
         let mut layer = PolyTorusSettlementLayer::new(config).unwrap();
-        
+
         let batch = create_test_batch();
         let result = layer.settle_batch(&batch).await.unwrap();
-        
+
         assert_eq!(result.settled_batches.len(), 1);
         assert_eq!(result.settled_batches[0], "test_batch_1");
     }
@@ -398,7 +411,7 @@ mod tests {
     async fn test_challenge_submission() {
         let config = SettlementConfig::default();
         let mut layer = PolyTorusSettlementLayer::new(config).unwrap();
-        
+
         let batch = create_test_batch();
         layer.settle_batch(&batch).await.unwrap();
 
@@ -423,7 +436,7 @@ mod tests {
     async fn test_challenge_processing() {
         let config = SettlementConfig::default();
         let mut layer = PolyTorusSettlementLayer::new(config).unwrap();
-        
+
         let batch = create_test_batch();
         layer.settle_batch(&batch).await.unwrap();
 
@@ -441,8 +454,11 @@ mod tests {
         };
 
         layer.submit_challenge(challenge).await.unwrap();
-        let result = layer.process_challenge(&"challenge_1".to_string()).await.unwrap();
-        
+        let result = layer
+            .process_challenge(&"challenge_1".to_string())
+            .await
+            .unwrap();
+
         assert_eq!(result.challenge_id, "challenge_1");
     }
 
@@ -450,7 +466,7 @@ mod tests {
     async fn test_settlement_root() {
         let config = SettlementConfig::default();
         let layer = PolyTorusSettlementLayer::new(config).unwrap();
-        
+
         let root = layer.get_settlement_root().await.unwrap();
         assert_eq!(root, "genesis_settlement_root");
     }
@@ -459,10 +475,10 @@ mod tests {
     async fn test_settlement_history() {
         let config = SettlementConfig::default();
         let mut layer = PolyTorusSettlementLayer::new(config).unwrap();
-        
+
         let batch = create_test_batch();
         layer.settle_batch(&batch).await.unwrap();
-        
+
         let history = layer.get_settlement_history(10).await.unwrap();
         // History will be empty initially as batches need to be finalized
         assert!(history.is_empty());
