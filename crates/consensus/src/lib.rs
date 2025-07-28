@@ -186,7 +186,7 @@ impl PolyTorusConsensusLayer {
             nonce += 1;
 
             // Debug output every 100k attempts
-            if nonce.is_multiple_of(&100_000) {
+            if nonce.is_multiple_of(100_000) {
                 log::info!(
                     "Mining attempt {}: hash = {}, required = {} zeros",
                     nonce,

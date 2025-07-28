@@ -213,7 +213,7 @@ impl PolyTorusUtxoConsensusLayer {
 
             nonce += 1;
 
-            if nonce.is_multiple_of(&100_000) {
+            if nonce.is_multiple_of(100_000) {
                 log::info!(
                     "Mining attempt {}: hash = {}, required = {} zeros",
                     nonce,

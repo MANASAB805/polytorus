@@ -503,7 +503,9 @@ impl WebRTCP2PNetwork {
     /// Get peer information
     pub async fn get_peer_info(&self, peer_id: &str) -> Option<PeerInfo> {
         let peers = self.peers.read().await;
-        peers.get(peer_id).map(|peer| peer.info.lock().unwrap().clone())
+        peers
+            .get(peer_id)
+            .map(|peer| peer.info.lock().unwrap().clone())
     }
 
     /// Get network statistics

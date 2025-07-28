@@ -322,12 +322,11 @@ impl PolyTorusExecutionLayer {
                 } => {
                     // Update script state
                     for (key, value) in updates {
-                        if self.script_state_manager.update_state(
-                            script_hash,
-                            key.clone(),
-                            value.clone(),
-                            &tx.hash,
-                        ).is_err() {
+                        if self
+                            .script_state_manager
+                            .update_state(script_hash, key.clone(), value.clone(), &tx.hash)
+                            .is_err()
+                        {
                             success = false;
                             break;
                         }
@@ -354,7 +353,10 @@ impl PolyTorusExecutionLayer {
                 }
             } else {
                 // Simple transfer
-                if self.transfer(&tx.from, tx.to.as_ref().unwrap(), tx.value).is_err() {
+                if self
+                    .transfer(&tx.from, tx.to.as_ref().unwrap(), tx.value)
+                    .is_err()
+                {
                     success = false;
                 }
             }

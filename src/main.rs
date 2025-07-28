@@ -6,11 +6,10 @@ use std::env;
 
 use consensus::consensus_engine::{PolyTorusUtxoConsensusLayer, UtxoConsensusConfig};
 use execution::execution_engine::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
-use execution::script_engine::ScriptType;
 use p2p_network::{P2PConfig, WebRTCP2PNetwork};
 use traits::{
-    ExecutionLayer, Hash, ScriptTransactionType, Transaction, TxInput, TxOutput,
-    UtxoConsensusLayer, UtxoExecutionLayer, UtxoId, UtxoTransaction,
+    Hash, ScriptTransactionType, Transaction, TxInput, TxOutput, UtxoConsensusLayer,
+    UtxoExecutionLayer, UtxoId, UtxoTransaction,
 };
 use wallet::{HdWallet, KeyPair, KeyType, Wallet};
 
@@ -297,9 +296,18 @@ impl PolyTorusBlockchain {
         wasm_bytes: Vec<u8>,
         name: Option<&str>,
     ) -> Result<Hash> {
-        info!("Deploying WASM contract for owner: {}", owner);
+        let contract_name = name.unwrap_or("unnamed_contract");
+        info!(
+            "Deploying WASM contract '{}' for owner: {}",
+            contract_name, owner
+        );
 
-        let tx_hash = format!("tx_deploy_contract_{}_{}", owner, uuid::Uuid::new_v4());
+        let tx_hash = format!(
+            "tx_deploy_contract_{}_{}_{}",
+            owner,
+            contract_name,
+            uuid::Uuid::new_v4()
+        );
 
         // Create deployment transaction
         let transaction = Transaction {
@@ -314,7 +322,7 @@ impl PolyTorusBlockchain {
             signature: vec![],
             script_type: Some(ScriptTransactionType::Deploy {
                 script_data: wasm_bytes,
-                init_params: vec![],
+                init_params: contract_name.as_bytes().to_vec(),
             }),
         };
 
