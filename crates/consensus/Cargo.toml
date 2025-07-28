@@ -1,0 +1,30 @@
+[package]
+name = "consensus"
+version = "0.1.0"
+edition = "2021"
+description = "Consensus Layer - Block ordering and validation"
+authors = ["quantumshiro"]
+license = "MIT"
+
+[dependencies]
+traits = { path = "../traits" }
+
+# Core dependencies
+anyhow = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+# Cryptography
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# Storage
+sled = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+uuid = { workspace = true }
+rand = { workspace = true }

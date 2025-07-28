@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-unknown-linux-gnu
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Build release
+      run: cargo build --release --target x86_64-unknown-linux-gnu
+    
+    - name: Package binary
+      run: |
+        cd target/x86_64-unknown-linux-gnu/release
+        tar czf ../../../polytorus-linux-amd64.tar.gz polytorus
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: polytorus-linux-amd64
+        path: polytorus-linux-amd64.tar.gz
+

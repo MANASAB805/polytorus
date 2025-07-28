@@ -1,0 +1,29 @@
+[package]
+name = "settlement"
+version = "0.1.0"
+edition = "2021"
+description = "Settlement Layer - Dispute resolution and finalization"
+authors = ["quantumshiro"]
+license = "MIT"
+
+[dependencies]
+traits = { path = "../traits" }
+
+# Core dependencies
+anyhow = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+
+# Cryptography
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# Storage
+sled = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+uuid = { workspace = true }
