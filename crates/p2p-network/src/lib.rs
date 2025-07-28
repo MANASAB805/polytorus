@@ -38,9 +38,7 @@ use std::{
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use log::{debug, error, info, warn};
-use rand;
 use serde::{Deserialize, Serialize};
-use serde_bytes;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use uuid::Uuid;
 
@@ -505,11 +503,7 @@ impl WebRTCP2PNetwork {
     /// Get peer information
     pub async fn get_peer_info(&self, peer_id: &str) -> Option<PeerInfo> {
         let peers = self.peers.read().await;
-        if let Some(peer) = peers.get(peer_id) {
-            Some(peer.info.lock().unwrap().clone())
-        } else {
-            None
-        }
+        peers.get(peer_id).map(|peer| peer.info.lock().unwrap().clone())
     }
 
     /// Get network statistics

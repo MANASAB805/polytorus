@@ -277,7 +277,7 @@ impl MerkleTree {
         let mut index = leaf_index;
 
         for level in &self.tree[..self.tree.len() - 1] {
-            let sibling_index = if index % 2 == 0 { index + 1 } else { index - 1 };
+            let sibling_index = if index.is_multiple_of(&2) { index + 1 } else { index - 1 };
 
             if sibling_index < level.len() {
                 proof.push(level[sibling_index].clone());

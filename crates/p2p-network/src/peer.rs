@@ -159,7 +159,7 @@ impl super::PeerConnection {
             0.95 // Poor latency
         };
 
-        info.reputation_score = (info.reputation_score * latency_factor).min(2.0).max(0.0);
+        info.reputation_score = (info.reputation_score * latency_factor).clamp(0.0, 2.0);
     }
 
     /// Handle ping message and respond with pong

@@ -274,7 +274,7 @@ impl ScriptEngine {
                         _ => return Err(anyhow!("Script execution trapped: {:?}", trap)),
                     }
                 }
-                return Err(e.into());
+                return Err(e);
             }
         };
 
