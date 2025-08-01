@@ -472,8 +472,8 @@ fn main() -> Result<()> {
 
 async fn async_main() -> Result<()> {
     // Docker output debugging
-    println!("🐳 PolyTorus starting in Docker container...");
-    eprintln!("🐳 PolyTorus stderr test...");
+    println!("PolyTorus starting in Docker container...");
+    eprintln!("PolyTorus stderr test...");
 
     // Initialize logging
     if env::var("RUST_LOG").is_err() {
@@ -481,7 +481,7 @@ async fn async_main() -> Result<()> {
     }
     env_logger::init();
 
-    println!("🐳 Environment initialized, parsing commands...");
+    println!("Environment initialized, parsing commands...");
 
     let matches = Command::new("polytorus")
         .version("0.1.0")
@@ -600,7 +600,7 @@ async fn async_main() -> Result<()> {
             let mut blockchain = PolyTorusBlockchain::new()?;
             let _genesis_id = blockchain.initialize_genesis().await?;
             info!("PolyTorus node started successfully");
-            println!("✅ PolyTorus blockchain node started successfully");
+            println!("PolyTorus blockchain node started successfully");
             println!("Genesis UTXO initialized with 10,000,000 units");
 
             info!("Start command completed successfully - exiting");
@@ -643,9 +643,9 @@ async fn async_main() -> Result<()> {
             let mut blockchain = PolyTorusBlockchain::new_with_p2p_config(Some(p2p_config))?;
             let _genesis_id = blockchain.initialize_genesis().await?;
 
-            println!("🚀 Starting PolyTorus P2P node: {}", node_id);
-            println!("📡 Listening on port: {}", listen_port);
-            println!("🔗 Bootstrap peers: {:?}", bootstrap_peers);
+            println!("Starting PolyTorus P2P node: {}", node_id);
+            println!("Listening on port: {}", listen_port);
+            println!("Bootstrap peers: {:?}", bootstrap_peers);
 
             // Start P2P network
             info!("Starting P2P network...");
@@ -662,7 +662,7 @@ async fn async_main() -> Result<()> {
 
             match blockchain.send_transaction(from, to, amount).await {
                 Ok(tx_hash) => {
-                    println!("✅ Transaction sent successfully");
+                    println!("Transaction sent successfully");
                     println!("Transaction Hash: {}", tx_hash);
                     println!("From: {}", from);
                     println!("To: {}", to);
@@ -670,15 +670,15 @@ async fn async_main() -> Result<()> {
                 }
                 Err(e) => {
                     error!("Failed to send transaction: {}", e);
-                    println!("❌ Transaction failed: {}", e);
+                    println!("Transaction failed: {}", e);
                 }
             }
         }
         Some(("status", _)) => {
-            println!("🐳 Docker: Executing status command...");
+            println!("Docker: Executing status command...");
             let blockchain = PolyTorusBlockchain::new()?;
             blockchain.get_status().await?;
-            println!("🐳 Docker: Status command completed.");
+            println!("Docker: Status command completed.");
         }
         Some(("deploy-contract", sub_matches)) => {
             let wasm_file = sub_matches.get_one::<String>("wasm-file").unwrap();
@@ -698,7 +698,7 @@ async fn async_main() -> Result<()> {
 
             match blockchain.deploy_contract(owner, wasm_bytes, name).await {
                 Ok(script_hash) => {
-                    println!("✅ Contract deployed successfully");
+                    println!("Contract deployed successfully");
                     println!("Contract Hash: {}", script_hash);
                     println!("Owner: {}", owner);
                     if let Some(n) = name {
@@ -707,7 +707,7 @@ async fn async_main() -> Result<()> {
                 }
                 Err(e) => {
                     error!("Failed to deploy contract: {}", e);
-                    println!("❌ Contract deployment failed: {}", e);
+                    println!("Contract deployment failed: {}", e);
                 }
             }
         }
@@ -733,7 +733,7 @@ async fn async_main() -> Result<()> {
                 .await
             {
                 Ok(tx_hash) => {
-                    println!("✅ Contract call successful");
+                    println!("Contract call successful");
                     println!("Transaction Hash: {}", tx_hash);
                     println!("Contract: {}", contract);
                     println!("Method: {}", method);
@@ -741,7 +741,7 @@ async fn async_main() -> Result<()> {
                 }
                 Err(e) => {
                     error!("Failed to call contract: {}", e);
-                    println!("❌ Contract call failed: {}", e);
+                    println!("Contract call failed: {}", e);
                 }
             }
         }
