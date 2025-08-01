@@ -18,6 +18,7 @@ members = [
     "crates/consensus",
     "crates/data-availability", 
     "crates/p2p-network",
+    "crates/sdk",
 ]
 
 resolver = "2"

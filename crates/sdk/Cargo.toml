@@ -1,0 +1,48 @@
+[package]
+name = "sdk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "PolyTorus SDK for developers to interact with the 4-layer modular blockchain"
+authors = ["quantumshiro"]
+license = "MIT"
+repository = "https://github.com/quantumshiro/polytorus"
+keywords = ["blockchain", "sdk", "polytorus", "modular", "api"]
+categories = ["api-bindings", "cryptography", "network-programming"]
+
+[dependencies]
+# Core PolyTorus dependencies
+traits = { path = "../traits" }
+execution = { path = "../execution" }
+settlement = { path = "../settlement" }
+consensus = { path = "../consensus" }
+data-availability = { path = "../data-availability" }
+
+# External wallet dependency
+wallet = { git = "https://github.com/PolyTorus/wallet.git" }
+
+# Core dependencies
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+uuid = { workspace = true }
+hex = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+env_logger = { workspace = true }
+
+[features]
+default = ["full"]
+full = ["execution-layer", "settlement-layer", "consensus-layer", "data-availability-layer"]
+execution-layer = []
+settlement-layer = []
+consensus-layer = []
+data-availability-layer = []
