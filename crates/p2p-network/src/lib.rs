@@ -54,15 +54,15 @@ use webrtc::{
     },
 };
 
-use traits::{Hash, P2PNetworkLayer, UtxoBlock, UtxoTransaction};
-use crate::discovery::{PeerDiscovery, DHT};
 use crate::auto_discovery::AutoDiscovery;
+use crate::discovery::{PeerDiscovery, DHT};
+use traits::{Hash, P2PNetworkLayer, UtxoBlock, UtxoTransaction};
 
+pub mod adaptive_network;
+pub mod auto_discovery;
+pub mod discovery;
 pub mod peer;
 pub mod signaling;
-pub mod discovery;
-pub mod auto_discovery;
-pub mod adaptive_network;
 
 /// P2P Network configuration for WebRTC connections
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -259,7 +259,7 @@ impl WebRTCP2PNetwork {
 
         // Initialize DHT
         let dht = Arc::new(DHT::new(config.node_id.clone()));
-        
+
         // Initialize auto discovery
         let auto_discovery = Arc::new(RwLock::new(AutoDiscovery::new(
             config.node_id.clone(),
@@ -292,10 +292,7 @@ impl WebRTCP2PNetwork {
 
     /// Start the P2P network and begin accepting connections
     pub async fn start(&self) -> Result<()> {
-        info!(
-            "Starting WebRTC P2P Network on {}",
-            self.config.listen_addr
-        );
+        info!("Starting WebRTC P2P Network on {}", self.config.listen_addr);
 
         // Update stats
         {
@@ -311,10 +308,7 @@ impl WebRTCP2PNetwork {
                 .await
             {
                 Ok(_) => info!("Connected to bootstrap peer: {}", peer_addr),
-                Err(e) => warn!(
-                    "Failed to connect to bootstrap peer {}: {}",
-                    peer_addr, e
-                ),
+                Err(e) => warn!("Failed to connect to bootstrap peer {}: {}", peer_addr, e),
             }
         }
 
@@ -656,11 +650,7 @@ impl WebRTCP2PNetwork {
                 let peer_id = peer_id_ice.clone();
                 Box::pin(async move {
                     if let Some(candidate) = candidate {
-                        debug!(
-                            "ICE candidate for peer {}: {}",
-                            peer_id,
-                            candidate
-                        );
+                        debug!("ICE candidate for peer {}: {}", peer_id, candidate);
                         // TODO: Send ICE candidate through signaling server
                     } else {
                         debug!("ICE gathering complete for peer: {}", peer_id);
@@ -944,8 +934,14 @@ impl WebRTCP2PNetwork {
                 peer_list,
                 timestamp,
             } => {
-                info!("Received peer announcement from {} (node: {}, addr: {}, peers: {}, time: {})", 
-                      peer_id, node_id, listen_addr, peer_list.len(), timestamp);
+                info!(
+                    "Received peer announcement from {} (node: {}, addr: {}, peers: {}, time: {})",
+                    peer_id,
+                    node_id,
+                    listen_addr,
+                    peer_list.len(),
+                    timestamp
+                );
                 // Peer announcement received - could connect to new peers
             }
             P2PMessage::Error {

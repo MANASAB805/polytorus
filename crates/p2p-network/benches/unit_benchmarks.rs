@@ -59,12 +59,12 @@ fn create_transaction(id: u64) -> UtxoTransaction {
 /// Benchmark core P2P operations
 fn benchmark_core_operations(c: &mut Criterion) {
     init_logging();
-    
+
     let mut group = c.benchmark_group("core_operations");
     group.sample_size(20);
     group.warm_up_time(Duration::from_millis(200));
     group.measurement_time(Duration::from_secs(1));
-    
+
     // Network creation
     group.bench_function("network_creation", |b| {
         b.iter(|| {
@@ -73,7 +73,7 @@ fn benchmark_core_operations(c: &mut Criterion) {
             black_box(network);
         });
     });
-    
+
     // Transaction creation
     group.bench_function("transaction_creation", |b| {
         b.iter(|| {
@@ -81,7 +81,7 @@ fn benchmark_core_operations(c: &mut Criterion) {
             black_box(tx);
         });
     });
-    
+
     // Serialization
     let tx = create_transaction(12345);
     group.bench_function("transaction_serialize", |b| {
@@ -90,7 +90,7 @@ fn benchmark_core_operations(c: &mut Criterion) {
             black_box(serialized);
         });
     });
-    
+
     // Deserialization
     let serialized = bincode::serialize(&tx).unwrap();
     group.bench_function("transaction_deserialize", |b| {
@@ -99,22 +99,22 @@ fn benchmark_core_operations(c: &mut Criterion) {
             black_box(deserialized);
         });
     });
-    
+
     group.finish();
 }
 
 /// Benchmark batch processing
 fn benchmark_batch_processing(c: &mut Criterion) {
     init_logging();
-    
+
     let mut group = c.benchmark_group("batch_processing");
     group.sample_size(15);
     group.warm_up_time(Duration::from_millis(300));
     group.measurement_time(Duration::from_secs(1));
-    
+
     for batch_size in [10, 50].iter() {
         group.throughput(Throughput::Elements(*batch_size as u64));
-        
+
         // Batch transaction creation
         group.bench_with_input(
             format!("create_batch_{}", batch_size),
@@ -128,7 +128,7 @@ fn benchmark_batch_processing(c: &mut Criterion) {
                 });
             },
         );
-        
+
         // Batch serialization
         group.bench_with_input(
             format!("serialize_batch_{}", batch_size),
@@ -137,7 +137,7 @@ fn benchmark_batch_processing(c: &mut Criterion) {
                 let transactions: Vec<_> = (0..batch_size)
                     .map(|i| create_transaction(i as u64))
                     .collect();
-                    
+
                 b.iter(|| {
                     let serialized: Vec<_> = transactions
                         .iter()
@@ -148,29 +148,29 @@ fn benchmark_batch_processing(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
 /// Benchmark network statistics
 fn benchmark_network_stats(c: &mut Criterion) {
     init_logging();
-    
+
     let config = create_config("stats_node", 8105);
     let network = WebRTCP2PNetwork::new(config).unwrap();
-    
+
     let mut group = c.benchmark_group("network_stats");
     group.sample_size(30);
     group.warm_up_time(Duration::from_millis(100));
     group.measurement_time(Duration::from_millis(500));
-    
+
     group.bench_function("get_stats", |b| {
         b.iter(|| {
             let stats = network.get_network_stats();
             black_box(stats);
         });
     });
-    
+
     group.bench_function("get_peers", |b| {
         let rt = tokio::runtime::Runtime::new().unwrap();
         b.iter(|| {
@@ -180,14 +180,14 @@ fn benchmark_network_stats(c: &mut Criterion) {
             });
         });
     });
-    
+
     group.finish();
 }
 
 criterion_group!(
     benches,
     benchmark_core_operations,
-    benchmark_batch_processing, 
+    benchmark_batch_processing,
     benchmark_network_stats
 );
 

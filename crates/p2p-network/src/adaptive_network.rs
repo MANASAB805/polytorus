@@ -39,7 +39,10 @@ impl WebRTCP2PNetwork {
             discovery.get_discovered_peers().await
         };
 
-        info!("Discovered {} peers through auto discovery", discovered_peers.len());
+        info!(
+            "Discovered {} peers through auto discovery",
+            discovered_peers.len()
+        );
 
         // Add discovered peers to DHT
         for peer in &discovered_peers {
@@ -51,17 +54,17 @@ impl WebRTCP2PNetwork {
             match peer_addr.parse() {
                 Ok(addr) => {
                     let peer_id = format!("bootstrap_{}", uuid::Uuid::new_v4());
-                    match self.connect_to_peer(peer_id.clone(), peer_addr.clone()).await {
+                    match self
+                        .connect_to_peer(peer_id.clone(), peer_addr.clone())
+                        .await
+                    {
                         Ok(_) => {
                             info!("Connected to bootstrap peer: {}", peer_addr);
                             // Add to auto discovery
                             let discovery = self.auto_discovery.read().await;
                             discovery.add_peer(peer_id, addr).await;
                         }
-                        Err(e) => warn!(
-                            "Failed to connect to bootstrap peer {}: {}",
-                            peer_addr, e
-                        ),
+                        Err(e) => warn!("Failed to connect to bootstrap peer {}: {}", peer_addr, e),
                     }
                 }
                 Err(_) => warn!("Invalid bootstrap peer address: {}", peer_addr),
@@ -130,7 +133,7 @@ impl WebRTCP2PNetwork {
                             drop(peers_read); // Release the lock
 
                             info!("Attempting to connect to discovered peer: {}", peer.node_id);
-                            
+
                             // This would need to be implemented as a method that doesn't require &self
                             // For now, just add to DHT
                             dht.add_node(peer.node_id.clone(), peer.address).await;
@@ -146,7 +149,10 @@ impl WebRTCP2PNetwork {
 
                 // Adaptive connection strategy: connect to more peers if network is small
                 if current_peers < 3 {
-                    debug!("Network is small ({}), actively seeking more peers", current_peers);
+                    debug!(
+                        "Network is small ({}), actively seeking more peers",
+                        current_peers
+                    );
                 }
             }
         });
@@ -176,16 +182,22 @@ impl WebRTCP2PNetwork {
     }
 
     /// Adaptive broadcast with better peer targeting
-    pub async fn adaptive_broadcast_transaction(&self, transaction: &traits::UtxoTransaction) -> Result<()> {
+    pub async fn adaptive_broadcast_transaction(
+        &self,
+        transaction: &traits::UtxoTransaction,
+    ) -> Result<()> {
         // Use normal broadcast first
         self.broadcast_transaction(transaction).await?;
 
         // Also try to broadcast to discovered peers that we might not be connected to
         let discovered_peers = self.get_discovered_peers().await;
-        
+
         if discovered_peers.len() > 0 {
-            debug!("Adaptive broadcast: also considering {} discovered peers", discovered_peers.len());
-            
+            debug!(
+                "Adaptive broadcast: also considering {} discovered peers",
+                discovered_peers.len()
+            );
+
             // In a full implementation, we could establish temporary connections
             // or use other means to reach these peers
         }

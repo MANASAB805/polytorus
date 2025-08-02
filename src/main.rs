@@ -8,12 +8,12 @@ use std::path::Path;
 use consensus::consensus_engine::{PolyTorusUtxoConsensusLayer, UtxoConsensusConfig};
 use execution::execution_engine::{PolyTorusUtxoExecutionLayer, UtxoExecutionConfig};
 use p2p_network::{P2PConfig, WebRTCP2PNetwork};
+use serde::{Deserialize, Serialize};
 use traits::{
     Hash, ScriptTransactionType, Transaction, TxInput, TxOutput, UtxoConsensusLayer,
     UtxoExecutionLayer, UtxoId, UtxoTransaction,
 };
 use wallet::{HdWallet, KeyPair, KeyType, Wallet};
-use serde::{Deserialize, Serialize};
 
 pub struct PolyTorusBlockchain {
     execution_layer: PolyTorusUtxoExecutionLayer,
@@ -41,7 +41,7 @@ pub struct PersistentBlockchainState {
     pub current_slot: u64,
     pub total_supply: u64,
     pub utxo_set_hash: String,
-    pub canonical_chain: Vec<String>,  // Block hashes in order
+    pub canonical_chain: Vec<String>,    // Block hashes in order
     pub last_block_hash: Option<String>, // Hash of the latest block
 }
 
@@ -59,15 +59,19 @@ impl Storage {
             .map_err(|e| anyhow::anyhow!("Failed to serialize blockchain state: {}", e))?;
         self.db.insert(BLOCKCHAIN_STATE_KEY, serialized)?;
         self.db.flush()?;
-        info!("Blockchain state saved: height={}, slot={}", state.chain_height, state.current_slot);
+        info!(
+            "Blockchain state saved: height={}, slot={}",
+            state.chain_height, state.current_slot
+        );
         Ok(())
     }
 
     pub fn load_blockchain_state(&self) -> Result<Option<PersistentBlockchainState>> {
         match self.db.get(BLOCKCHAIN_STATE_KEY)? {
             Some(data) => {
-                let state = bincode::deserialize(&data)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize blockchain state: {}", e))?;
+                let state = bincode::deserialize(&data).map_err(|e| {
+                    anyhow::anyhow!("Failed to deserialize blockchain state: {}", e)
+                })?;
                 info!("Blockchain state loaded from storage");
                 Ok(Some(state))
             }
@@ -109,7 +113,10 @@ impl Storage {
     }
 
     /// Load all blocks referenced in canonical chain
-    pub fn load_blocks_for_chain(&self, canonical_chain: &[String]) -> Result<std::collections::HashMap<String, traits::UtxoBlock>> {
+    pub fn load_blocks_for_chain(
+        &self,
+        canonical_chain: &[String],
+    ) -> Result<std::collections::HashMap<String, traits::UtxoBlock>> {
         let mut blocks = std::collections::HashMap::new();
         for block_hash in canonical_chain {
             if let Some(block) = self.load_block(block_hash)? {
@@ -122,7 +129,8 @@ impl Storage {
 
 impl PolyTorusBlockchain {
     pub fn new() -> Result<Self> {
-        let data_dir = env::var("POLYTORUS_DATA_DIR").unwrap_or_else(|_| "./polytorus_data".to_string());
+        let data_dir =
+            env::var("POLYTORUS_DATA_DIR").unwrap_or_else(|_| "./polytorus_data".to_string());
         Self::new_with_storage_and_p2p_config(&data_dir, None)
     }
 
@@ -132,11 +140,15 @@ impl PolyTorusBlockchain {
 
     pub fn new_with_p2p_config(p2p_config: Option<P2PConfig>) -> Result<Self> {
         // Use persistent storage in current directory
-        let data_dir = env::var("POLYTORUS_DATA_DIR").unwrap_or_else(|_| "./polytorus_data".to_string());
+        let data_dir =
+            env::var("POLYTORUS_DATA_DIR").unwrap_or_else(|_| "./polytorus_data".to_string());
         Self::new_with_storage_and_p2p_config(&data_dir, p2p_config)
     }
 
-    pub fn new_with_storage_and_p2p_config(data_dir: &str, p2p_config: Option<P2PConfig>) -> Result<Self> {
+    pub fn new_with_storage_and_p2p_config(
+        data_dir: &str,
+        p2p_config: Option<P2PConfig>,
+    ) -> Result<Self> {
         // Initialize persistent storage first
         let storage = Storage::new(data_dir)?;
         info!("Initialized persistent storage at: {}", data_dir);
@@ -156,16 +168,18 @@ impl PolyTorusBlockchain {
         );
 
         let execution_layer = PolyTorusUtxoExecutionLayer::new(execution_config)?;
-        
+
         // Try to load existing blockchain state
         let consensus_layer = if let Some(persistent_state) = storage.load_blockchain_state()? {
-            info!("Restoring consensus layer from persistent state: height={}, slot={}", 
-                  persistent_state.chain_height, persistent_state.current_slot);
-            
+            info!(
+                "Restoring consensus layer from persistent state: height={}, slot={}",
+                persistent_state.chain_height, persistent_state.current_slot
+            );
+
             // Load all blocks for the canonical chain
             let blocks = storage.load_blocks_for_chain(&persistent_state.canonical_chain)?;
             info!("Loaded {} blocks from storage", blocks.len());
-            
+
             // Create consensus layer with restored state
             PolyTorusUtxoConsensusLayer::new_with_restored_state_and_blocks(
                 consensus_config,
@@ -254,7 +268,9 @@ impl PolyTorusBlockchain {
     }
 
     /// Get adaptive network statistics
-    pub async fn get_adaptive_network_stats(&self) -> p2p_network::adaptive_network::AdaptiveNetworkStats {
+    pub async fn get_adaptive_network_stats(
+        &self,
+    ) -> p2p_network::adaptive_network::AdaptiveNetworkStats {
         self.p2p_network.get_adaptive_network_stats().await
     }
 
@@ -272,7 +288,10 @@ impl PolyTorusBlockchain {
         // Check if blockchain state already exists
         if let Some(persistent_state) = self.storage.load_blockchain_state()? {
             info!("Found existing blockchain state - skipping genesis initialization");
-            info!("Current height: {}, slot: {}", persistent_state.chain_height, persistent_state.current_slot);
+            info!(
+                "Current height: {}, slot: {}",
+                persistent_state.chain_height, persistent_state.current_slot
+            );
             // Return a dummy ID since we're not creating new genesis
             return Ok(UtxoId {
                 tx_hash: "genesis_tx".to_string(),
@@ -299,7 +318,7 @@ impl PolyTorusBlockchain {
         self.execution_layer
             .initialize_genesis_utxo_set(vec![(genesis_utxo_id.clone(), genesis_utxo)])?;
         info!("Genesis UTXO created: {:?}", genesis_utxo_id);
-        
+
         // Save initial genesis state
         self.save_blockchain_state().await?;
         info!("Genesis initialization completed successfully");
@@ -439,10 +458,10 @@ impl PolyTorusBlockchain {
                     } else {
                         info!("Block saved to persistent storage: {}", block.hash);
                     }
-                    
+
                     self.consensus_layer.add_utxo_block(block).await?;
                     info!("Block added to chain");
-                    
+
                     // Save state after successful block addition
                     if let Err(e) = self.save_blockchain_state().await {
                         error!("Failed to save blockchain state: {}", e);
@@ -497,7 +516,7 @@ impl PolyTorusBlockchain {
         let utxo_set_hash = self.execution_layer.get_utxo_set_hash().await?;
         let total_supply = self.execution_layer.get_total_supply().await?;
         let canonical_chain = self.consensus_layer.get_canonical_chain().await?;
-        
+
         // Get the hash of the latest block (last in canonical chain)
         let last_block_hash = if canonical_chain.len() > 1 {
             // Skip genesis block and get the latest
@@ -891,7 +910,7 @@ async fn async_main() -> Result<()> {
 
             // Check if adaptive mode is enabled
             let adaptive_mode = sub_matches.get_flag("adaptive");
-            
+
             // Start P2P network
             if adaptive_mode {
                 info!("Starting adaptive P2P network...");
@@ -933,13 +952,13 @@ async fn async_main() -> Result<()> {
         Some(("network-status", _)) => {
             info!("Getting P2P network status...");
             let blockchain = PolyTorusBlockchain::new()?;
-            
+
             // Get basic network statistics
             let stats = blockchain.get_p2p_network_stats();
-            
+
             // Get adaptive network statistics
             let adaptive_stats = blockchain.get_adaptive_network_stats().await;
-            
+
             println!("P2P Network Status:");
             println!("==================");
             println!("Total Connections: {}", stats.total_connections);
@@ -951,37 +970,50 @@ async fn async_main() -> Result<()> {
             println!("Connection Errors: {}", stats.connection_errors);
             println!();
             println!("Adaptive Network Statistics:");
-            println!("Discovered Peers: {}", adaptive_stats.discovered_peers_count);
+            println!(
+                "Discovered Peers: {}",
+                adaptive_stats.discovered_peers_count
+            );
             println!("DHT Nodes: {}", adaptive_stats.dht_nodes_count);
             println!("Connected Peers: {}", adaptive_stats.connected_peers_count);
-            println!("Discovery Efficiency: {:.2}%", adaptive_stats.discovery_efficiency * 100.0);
+            println!(
+                "Discovery Efficiency: {:.2}%",
+                adaptive_stats.discovery_efficiency * 100.0
+            );
         }
         Some(("peers", _)) => {
             info!("Getting peer information...");
             let blockchain = PolyTorusBlockchain::new()?;
-            
+
             // Get connected peers
             let connected_peers = blockchain.get_connected_peers().await;
-            
+
             // Get discovered peers
             let discovered_peers = blockchain.get_discovered_peers().await;
-            
+
             println!("Peer Information:");
             println!("================");
             println!("Connected Peers ({}):", connected_peers.len());
             for (i, peer) in connected_peers.iter().enumerate() {
                 println!("  {}. {}", i + 1, peer);
             }
-            
+
             println!();
             println!("Discovered Peers ({}):", discovered_peers.len());
             for (i, peer) in discovered_peers.iter().enumerate() {
                 let last_seen_mins = (std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
-                    .as_secs() - peer.last_seen) / 60;
-                println!("  {}. {} ({}) - Last seen: {} min ago", 
-                         i + 1, peer.node_id, peer.address, last_seen_mins);
+                    .as_secs()
+                    - peer.last_seen)
+                    / 60;
+                println!(
+                    "  {}. {} ({}) - Last seen: {} min ago",
+                    i + 1,
+                    peer.node_id,
+                    peer.address,
+                    last_seen_mins
+                );
             }
         }
         Some(("deploy-contract", sub_matches)) => {

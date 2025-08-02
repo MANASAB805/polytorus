@@ -70,16 +70,16 @@ async fn test_non_blocking_peer_discovery() -> Result<()> {
 
     let network1 = WebRTCP2PNetwork::new(config1)?;
     let network2 = WebRTCP2PNetwork::new(config2)?;
-    
+
     info!("Created both networks");
 
     // Test discovery functionality without full startup
     let discovered_peers1 = network1.get_discovered_peers().await;
     let discovered_peers2 = network2.get_discovered_peers().await;
-    
+
     info!("Network 1 discovered {} peers", discovered_peers1.len());
     info!("Network 2 discovered {} peers", discovered_peers2.len());
-    
+
     // Initially should be empty
     assert_eq!(discovered_peers1.len(), 0);
     assert_eq!(discovered_peers2.len(), 0);
@@ -87,41 +87,55 @@ async fn test_non_blocking_peer_discovery() -> Result<()> {
     // Test broadcasting capabilities
     let tx1 = create_test_tx(1);
     let broadcast_result1 = network1.broadcast_transaction(&tx1).await;
-    
+
     let tx2 = create_test_tx(2);
     let broadcast_result2 = network2.broadcast_transaction(&tx2).await;
-    
-    assert!(broadcast_result1.is_ok(), "Network 1 should broadcast successfully");
-    assert!(broadcast_result2.is_ok(), "Network 2 should broadcast successfully");
-    
+
+    assert!(
+        broadcast_result1.is_ok(),
+        "Network 1 should broadcast successfully"
+    );
+    assert!(
+        broadcast_result2.is_ok(),
+        "Network 2 should broadcast successfully"
+    );
+
     info!("Both networks can broadcast transactions");
 
     // Get network statistics
     let stats1 = network1.get_network_stats();
     let stats2 = network2.get_network_stats();
-    
-    info!("Network 1 stats: connections={}, messages_sent={}", 
-          stats1.active_connections, stats1.messages_sent);
-    info!("Network 2 stats: connections={}, messages_sent={}", 
-          stats2.active_connections, stats2.messages_sent);
+
+    info!(
+        "Network 1 stats: connections={}, messages_sent={}",
+        stats1.active_connections, stats1.messages_sent
+    );
+    info!(
+        "Network 2 stats: connections={}, messages_sent={}",
+        stats2.active_connections, stats2.messages_sent
+    );
 
     // Test adaptive network statistics if available
     let adaptive_stats1 = network1.get_adaptive_network_stats().await;
     let adaptive_stats2 = network2.get_adaptive_network_stats().await;
-    
-    info!("Network 1 adaptive stats: discovered={}, connected={}, efficiency={:.2}", 
-          adaptive_stats1.discovered_peers_count, 
-          adaptive_stats1.connected_peers_count,
-          adaptive_stats1.discovery_efficiency);
-    info!("Network 2 adaptive stats: discovered={}, connected={}, efficiency={:.2}", 
-          adaptive_stats2.discovered_peers_count, 
-          adaptive_stats2.connected_peers_count,
-          adaptive_stats2.discovery_efficiency);
+
+    info!(
+        "Network 1 adaptive stats: discovered={}, connected={}, efficiency={:.2}",
+        adaptive_stats1.discovered_peers_count,
+        adaptive_stats1.connected_peers_count,
+        adaptive_stats1.discovery_efficiency
+    );
+    info!(
+        "Network 2 adaptive stats: discovered={}, connected={}, efficiency={:.2}",
+        adaptive_stats2.discovered_peers_count,
+        adaptive_stats2.connected_peers_count,
+        adaptive_stats2.discovery_efficiency
+    );
 
     // Cleanup
     network1.shutdown().await?;
     network2.shutdown().await?;
-    
+
     info!("Non-blocking peer discovery test completed");
     Ok(())
 }
@@ -133,14 +147,14 @@ async fn test_non_blocking_network_expansion() -> Result<()> {
 
     // Create multiple networks simulating gradual expansion
     let mut networks = Vec::new();
-    
+
     for i in 0..4 {
         let config = P2PConfig {
             node_id: format!("expansion_node_{}", i),
             listen_addr: format!("127.0.0.1:{}", 12010 + i).parse().unwrap(),
-            bootstrap_peers: if i == 0 { 
-                vec![] 
-            } else { 
+            bootstrap_peers: if i == 0 {
+                vec![]
+            } else {
                 vec![format!("127.0.0.1:{}", 12010)] // Bootstrap to first node
             },
             stun_servers: vec![],
@@ -149,7 +163,7 @@ async fn test_non_blocking_network_expansion() -> Result<()> {
             keep_alive_interval: 30,
             debug_mode: false,
         };
-        
+
         let network = WebRTCP2PNetwork::new(config)?;
         networks.push(network);
         info!("Created network {}", i);
@@ -163,39 +177,57 @@ async fn test_non_blocking_network_expansion() -> Result<()> {
             successful_broadcasts += 1;
         }
     }
-    
-    assert_eq!(successful_broadcasts, 4, "All networks should handle transactions");
-    info!("All {} networks can handle transactions", successful_broadcasts);
+
+    assert_eq!(
+        successful_broadcasts, 4,
+        "All networks should handle transactions"
+    );
+    info!(
+        "All {} networks can handle transactions",
+        successful_broadcasts
+    );
 
     // Check network capabilities
     for (i, network) in networks.iter().enumerate() {
         let discovered = network.get_discovered_peers().await;
         let connected = network.get_connected_peers().await;
         let stats = network.get_network_stats();
-        
-        info!("Network {} - Discovered: {}, Connected: {}, Total connections: {}", 
-              i, discovered.len(), connected.len(), stats.total_connections);
+
+        info!(
+            "Network {} - Discovered: {}, Connected: {}, Total connections: {}",
+            i,
+            discovered.len(),
+            connected.len(),
+            stats.total_connections
+        );
     }
 
     // Test adaptive broadcasting on all networks
     let tx_broadcast = create_test_tx(200);
     let mut adaptive_broadcast_results = 0;
-    
+
     for (i, network) in networks.iter().enumerate() {
-        if network.adaptive_broadcast_transaction(&tx_broadcast).await.is_ok() {
+        if network
+            .adaptive_broadcast_transaction(&tx_broadcast)
+            .await
+            .is_ok()
+        {
             adaptive_broadcast_results += 1;
         }
         info!("Network {} adaptive broadcast result: OK", i);
     }
-    
-    assert_eq!(adaptive_broadcast_results, 4, "All networks should support adaptive broadcast");
+
+    assert_eq!(
+        adaptive_broadcast_results, 4,
+        "All networks should support adaptive broadcast"
+    );
 
     // Cleanup all networks
     for (i, network) in networks.into_iter().enumerate() {
         network.shutdown().await?;
         info!("Network {} shutdown complete", i);
     }
-    
+
     info!("Non-blocking network expansion test completed");
     Ok(())
 }
@@ -207,7 +239,7 @@ async fn test_non_blocking_network_resilience() -> Result<()> {
 
     // Create a small network setup
     let mut networks = Vec::new();
-    
+
     for i in 0..3 {
         let config = P2PConfig {
             node_id: format!("resilient_node_{}", i),
@@ -223,11 +255,11 @@ async fn test_non_blocking_network_resilience() -> Result<()> {
             keep_alive_interval: 30,
             debug_mode: false,
         };
-        
+
         let network = WebRTCP2PNetwork::new(config)?;
         networks.push(network);
     }
-    
+
     info!("Created {} networks for resilience testing", networks.len());
 
     // Test all networks are functional
@@ -235,10 +267,12 @@ async fn test_non_blocking_network_resilience() -> Result<()> {
         let tx = create_test_tx(300 + i as u64);
         let result = network.broadcast_transaction(&tx).await;
         assert!(result.is_ok(), "Network {} should be functional", i);
-        
+
         let stats = network.get_network_stats();
-        info!("Network {} initial stats: connections={}, messages_sent={}", 
-              i, stats.active_connections, stats.messages_sent);
+        info!(
+            "Network {} initial stats: connections={}, messages_sent={}",
+            i, stats.active_connections, stats.messages_sent
+        );
     }
 
     // Simulate "node failure" by shutting down middle network
@@ -252,9 +286,13 @@ async fn test_non_blocking_network_resilience() -> Result<()> {
         let tx = create_test_tx(400 + i as u64);
         let result = network.broadcast_transaction(&tx).await;
         assert!(result.is_ok(), "Remaining network {} should still work", i);
-        
+
         let discovered = network.get_discovered_peers().await;
-        info!("Network {} after failure - Discovered peers: {}", i, discovered.len());
+        info!(
+            "Network {} after failure - Discovered peers: {}",
+            i,
+            discovered.len()
+        );
     }
 
     // Add new "healing" network
@@ -262,17 +300,14 @@ async fn test_non_blocking_network_resilience() -> Result<()> {
     let healing_config = P2PConfig {
         node_id: "healing_node".to_string(),
         listen_addr: "127.0.0.1:12030".parse().unwrap(),
-        bootstrap_peers: vec![
-            "127.0.0.1:12020".to_string(),
-            "127.0.0.1:12022".to_string(),
-        ],
+        bootstrap_peers: vec!["127.0.0.1:12020".to_string(), "127.0.0.1:12022".to_string()],
         stun_servers: vec![],
         max_peers: 5,
         connection_timeout: 5,
         keep_alive_interval: 30,
         debug_mode: false,
     };
-    
+
     let healing_network = WebRTCP2PNetwork::new(healing_config)?;
     networks.push(healing_network);
 
@@ -283,23 +318,33 @@ async fn test_non_blocking_network_resilience() -> Result<()> {
         if network.broadcast_transaction(&tx).await.is_ok() {
             working_nodes += 1;
         }
-        
+
         let discovered = network.get_discovered_peers().await;
         let adaptive_stats = network.get_adaptive_network_stats().await;
-        info!("Network {} after healing - Discovered: {}, DHT nodes: {}", 
-              i, discovered.len(), adaptive_stats.dht_nodes_count);
+        info!(
+            "Network {} after healing - Discovered: {}, DHT nodes: {}",
+            i,
+            discovered.len(),
+            adaptive_stats.dht_nodes_count
+        );
     }
-    
-    assert!(working_nodes >= 2, "At least 2 nodes should work after healing");
-    info!("Network resilience test: {}/{} nodes working after healing", 
-          working_nodes, networks.len());
+
+    assert!(
+        working_nodes >= 2,
+        "At least 2 nodes should work after healing"
+    );
+    info!(
+        "Network resilience test: {}/{} nodes working after healing",
+        working_nodes,
+        networks.len()
+    );
 
     // Cleanup remaining networks
     for (i, network) in networks.into_iter().enumerate() {
         network.shutdown().await?;
         info!("Network {} cleanup complete", i);
     }
-    
+
     info!("Non-blocking network resilience test completed");
     Ok(())
 }
@@ -325,46 +370,54 @@ async fn test_discovery_mechanisms() -> Result<()> {
     // Test initial discovery state
     let initial_discovered = network.get_discovered_peers().await;
     let initial_connected = network.get_connected_peers().await;
-    
-    info!("Initial state - Discovered: {}, Connected: {}", 
-          initial_discovered.len(), initial_connected.len());
-    
+
+    info!(
+        "Initial state - Discovered: {}, Connected: {}",
+        initial_discovered.len(),
+        initial_connected.len()
+    );
+
     assert_eq!(initial_discovered.len(), 0);
     assert_eq!(initial_connected.len(), 0);
 
     // Test adaptive network statistics
     let adaptive_stats = network.get_adaptive_network_stats().await;
-    
-    info!("Adaptive stats - Discovered peers: {}, DHT nodes: {}, Connected: {}, Efficiency: {:.2}", 
-          adaptive_stats.discovered_peers_count,
-          adaptive_stats.dht_nodes_count,
-          adaptive_stats.connected_peers_count,
-          adaptive_stats.discovery_efficiency);
+
+    info!(
+        "Adaptive stats - Discovered peers: {}, DHT nodes: {}, Connected: {}, Efficiency: {:.2}",
+        adaptive_stats.discovered_peers_count,
+        adaptive_stats.dht_nodes_count,
+        adaptive_stats.connected_peers_count,
+        adaptive_stats.discovery_efficiency
+    );
 
     // Test adaptive broadcasting
     let tx = create_test_tx(600);
     let adaptive_result = network.adaptive_broadcast_transaction(&tx).await;
     assert!(adaptive_result.is_ok(), "Adaptive broadcast should work");
-    
+
     info!("Adaptive broadcast successful");
 
     // Test multiple data requests to exercise discovery
     for i in 0..5 {
-        let result = network.request_blockchain_data(
-            "test_data".to_string(), 
-            format!("discovery_test_{}", i)
-        ).await;
+        let result = network
+            .request_blockchain_data("test_data".to_string(), format!("discovery_test_{}", i))
+            .await;
         info!("Data request {} result: {:?}", i, result.is_ok());
     }
 
     // Check final stats
     let final_stats = network.get_network_stats();
     let final_adaptive = network.get_adaptive_network_stats().await;
-    
-    info!("Final stats - Messages sent: {}, Total connections: {}", 
-          final_stats.messages_sent, final_stats.total_connections);
-    info!("Final adaptive - Discovery efficiency: {:.2}", 
-          final_adaptive.discovery_efficiency);
+
+    info!(
+        "Final stats - Messages sent: {}, Total connections: {}",
+        final_stats.messages_sent, final_stats.total_connections
+    );
+    info!(
+        "Final adaptive - Discovery efficiency: {:.2}",
+        final_adaptive.discovery_efficiency
+    );
 
     network.shutdown().await?;
     info!("Discovery mechanisms test completed");
