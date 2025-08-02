@@ -85,7 +85,7 @@ impl super::PeerConnection {
                     // Increase reputation for successful sends
                     info.reputation_score = (info.reputation_score + 0.01).min(2.0);
                 }
-                debug!("📤 Sent message to peer {}: {:?}", self.id, message);
+                debug!("Sent message to peer {}: {:?}", self.id, message);
                 Ok(())
             }
             Ok(Err(e)) => {
@@ -94,7 +94,7 @@ impl super::PeerConnection {
                     let mut info = self.info.lock().unwrap();
                     info.reputation_score = (info.reputation_score - 0.1).max(0.0);
                 }
-                error!("❌ Failed to send message to peer {}: {}", self.id, e);
+                error!("Failed to send message to peer {}: {}", self.id, e);
                 Err(anyhow::anyhow!("Send failed: {}", e))
             }
             Err(_) => {
@@ -103,7 +103,7 @@ impl super::PeerConnection {
                     let mut info = self.info.lock().unwrap();
                     info.reputation_score = (info.reputation_score - 0.2).max(0.0);
                 }
-                error!("⏰ Timeout sending message to peer: {}", self.id);
+                error!("Timeout sending message to peer: {}", self.id);
                 Err(anyhow::anyhow!("Send timeout"))
             }
         }
@@ -111,7 +111,7 @@ impl super::PeerConnection {
 
     /// Disconnect this peer connection
     pub async fn disconnect(&self) -> Result<()> {
-        info!("🔌 Disconnecting peer: {}", self.id);
+        info!("Disconnecting peer: {}", self.id);
 
         // Close data channel if available
         {
@@ -128,7 +128,7 @@ impl super::PeerConnection {
             warn!("Error closing peer connection for {}: {}", self.id, e);
         }
 
-        info!("✅ Peer {} disconnected successfully", self.id);
+        info!("Peer {} disconnected successfully", self.id);
         Ok(())
     }
 
@@ -206,7 +206,7 @@ impl super::PeerConnection {
         };
 
         self.send_message(handshake_message).await?;
-        info!("🤝 Sent handshake to peer: {}", self.id);
+        info!("Sent handshake to peer: {}", self.id);
         Ok(())
     }
 }

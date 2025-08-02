@@ -124,6 +124,123 @@ impl PolyTorusUtxoConsensusLayer {
         Ok(layer)
     }
 
+    /// Create new eUTXO consensus layer with restored state
+    pub fn new_with_restored_state(
+        config: UtxoConsensusConfig,
+        validator_address: String,
+        restored_height: u64,
+        restored_slot: u64,
+        canonical_chain: Vec<String>,
+    ) -> Result<Self> {
+        let genesis_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let genesis_block = Self::create_genesis_utxo_block(genesis_time);
+        let genesis_hash = genesis_block.hash.clone();
+
+        let mut blocks = HashMap::new();
+        blocks.insert(genesis_hash.clone(), genesis_block);
+
+        // Restore chain state from persistent data
+        let chain_state = UtxoChainState {
+            canonical_chain,
+            blocks,
+            height: restored_height,
+            current_slot: restored_slot,
+            pending_transactions: Vec::new(),
+        };
+
+        let layer = Self {
+            chain_state: Arc::new(Mutex::new(chain_state)),
+            validators: Arc::new(Mutex::new(HashMap::new())),
+            config,
+            validator_address: Some(validator_address.clone()),
+            genesis_time,
+        };
+
+        // Add self as validator
+        let validator_info = ValidatorInfo {
+            address: validator_address,
+            stake: 1000,
+            public_key: vec![1, 2, 3],
+            active: true,
+        };
+
+        {
+            let mut validators = layer.validators.lock().unwrap();
+            validators.insert(validator_info.address.clone(), validator_info);
+        }
+
+        Ok(layer)
+    }
+
+    /// Create new eUTXO consensus layer with restored state and blocks
+    pub fn new_with_restored_state_and_blocks(
+        config: UtxoConsensusConfig,
+        validator_address: String,
+        restored_height: u64,
+        restored_slot: u64,
+        canonical_chain: Vec<String>,
+        restored_blocks: HashMap<String, UtxoBlock>,
+    ) -> Result<Self> {
+        let genesis_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        // If no blocks are restored, create genesis block
+        let mut blocks = if restored_blocks.is_empty() {
+            let genesis_block = Self::create_genesis_utxo_block(genesis_time);
+            let genesis_hash = genesis_block.hash.clone();
+            let mut blocks = HashMap::new();
+            blocks.insert(genesis_hash, genesis_block);
+            blocks
+        } else {
+            restored_blocks
+        };
+
+        // Ensure genesis block exists if not in restored blocks
+        let genesis_hash = "genesis_utxo_block_hash".to_string();
+        if !blocks.contains_key(&genesis_hash) {
+            let genesis_block = Self::create_genesis_utxo_block(genesis_time);
+            blocks.insert(genesis_hash, genesis_block);
+        }
+
+        // Restore chain state from persistent data
+        let chain_state = UtxoChainState {
+            canonical_chain,
+            blocks,
+            height: restored_height,
+            current_slot: restored_slot,
+            pending_transactions: Vec::new(),
+        };
+
+        let layer = Self {
+            chain_state: Arc::new(Mutex::new(chain_state)),
+            validators: Arc::new(Mutex::new(HashMap::new())),
+            config,
+            validator_address: Some(validator_address.clone()),
+            genesis_time,
+        };
+
+        // Add self as validator
+        let validator_info = ValidatorInfo {
+            address: validator_address,
+            stake: 1000,
+            public_key: vec![1, 2, 3],
+            active: true,
+        };
+
+        {
+            let mut validators = layer.validators.lock().unwrap();
+            validators.insert(validator_info.address.clone(), validator_info);
+        }
+
+        Ok(layer)
+    }
+
     /// Create genesis eUTXO block
     fn create_genesis_utxo_block(genesis_time: u64) -> UtxoBlock {
         UtxoBlock {

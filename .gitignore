@@ -29,3 +29,5 @@ test_simple_circuit_operations_obfuscation/
 logs
 :memory:
 blockchain_data
+
+polytorus_data

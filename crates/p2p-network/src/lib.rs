@@ -55,9 +55,14 @@ use webrtc::{
 };
 
 use traits::{Hash, P2PNetworkLayer, UtxoBlock, UtxoTransaction};
+use crate::discovery::{PeerDiscovery, DHT};
+use crate::auto_discovery::AutoDiscovery;
 
 pub mod peer;
 pub mod signaling;
+pub mod discovery;
+pub mod auto_discovery;
+pub mod adaptive_network;
 
 /// P2P Network configuration for WebRTC connections
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -196,6 +201,12 @@ pub struct WebRTCP2PNetwork {
     /// Shutdown signal
     shutdown_tx: mpsc::Sender<()>,
     shutdown_rx: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
+    /// Peer discovery service
+    discovery: Option<Arc<PeerDiscovery>>,
+    /// Distributed hash table for peer routing
+    dht: Arc<DHT>,
+    /// Auto discovery service
+    auto_discovery: Arc<RwLock<AutoDiscovery>>,
 }
 
 /// Individual peer connection wrapper
@@ -237,14 +248,23 @@ impl WebRTCP2PNetwork {
             .build();
 
         info!(
-            "🌐 Initializing WebRTC P2P Network for node: {}",
+            "Initializing WebRTC P2P Network for node: {}",
             config.node_id
         );
-        info!("📡 STUN servers: {:?}", config.stun_servers);
+        info!("STUN servers: {:?}", config.stun_servers);
         info!(
-            "🔗 Max peers: {}, Timeout: {}s",
+            "Max peers: {}, Timeout: {}s",
             config.max_peers, config.connection_timeout
         );
+
+        // Initialize DHT
+        let dht = Arc::new(DHT::new(config.node_id.clone()));
+        
+        // Initialize auto discovery
+        let auto_discovery = Arc::new(RwLock::new(AutoDiscovery::new(
+            config.node_id.clone(),
+            config.listen_addr.port(),
+        )));
 
         Ok(Self {
             config,
@@ -264,13 +284,16 @@ impl WebRTCP2PNetwork {
             })),
             shutdown_tx,
             shutdown_rx: Arc::new(Mutex::new(Some(shutdown_rx))),
+            discovery: None, // Will be initialized in start()
+            dht,
+            auto_discovery,
         })
     }
 
     /// Start the P2P network and begin accepting connections
     pub async fn start(&self) -> Result<()> {
         info!(
-            "🚀 Starting WebRTC P2P Network on {}",
+            "Starting WebRTC P2P Network on {}",
             self.config.listen_addr
         );
 
@@ -287,9 +310,9 @@ impl WebRTCP2PNetwork {
                 .connect_to_peer(peer_id.clone(), peer_addr.clone())
                 .await
             {
-                Ok(_) => info!("✅ Connected to bootstrap peer: {}", peer_addr),
+                Ok(_) => info!("Connected to bootstrap peer: {}", peer_addr),
                 Err(e) => warn!(
-                    "❌ Failed to connect to bootstrap peer {}: {}",
+                    "Failed to connect to bootstrap peer {}: {}",
                     peer_addr, e
                 ),
             }
@@ -304,7 +327,7 @@ impl WebRTCP2PNetwork {
         // Start message processing task
         self.start_message_processing_task().await;
 
-        info!("✅ WebRTC P2P Network started successfully");
+        info!("WebRTC P2P Network started successfully");
 
         // Wait for shutdown signal
         let mut shutdown_rx = {
@@ -316,7 +339,7 @@ impl WebRTCP2PNetwork {
 
         // Block until shutdown signal received
         shutdown_rx.recv().await;
-        info!("🔄 Received shutdown signal, stopping P2P network");
+        info!("Received shutdown signal, stopping P2P network");
 
         Ok(())
     }
@@ -324,7 +347,7 @@ impl WebRTCP2PNetwork {
     /// Connect to a specific peer
     pub async fn connect_to_peer(&self, peer_id: String, peer_address: String) -> Result<()> {
         info!(
-            "🔗 Attempting connection to peer {} at {}",
+            "Attempting connection to peer {} at {}",
             peer_id, peer_address
         );
 
@@ -429,7 +452,7 @@ impl WebRTCP2PNetwork {
         // TODO: Implement signaling server to exchange SDP and ICE candidates
         // For now, this is a placeholder for the signaling mechanism
         info!(
-            "📋 Created offer for peer {}, awaiting signaling implementation",
+            "Created offer for peer {}, awaiting signaling implementation",
             peer_id
         );
 
@@ -471,17 +494,17 @@ impl WebRTCP2PNetwork {
             match peer.send_message(message.clone()).await {
                 Ok(_) => {
                     sent_count += 1;
-                    debug!("📤 Sent message to peer: {}", peer_id);
+                    debug!("Sent message to peer: {}", peer_id);
                 }
                 Err(e) => {
                     error_count += 1;
-                    warn!("❌ Failed to send message to peer {}: {}", peer_id, e);
+                    warn!("Failed to send message to peer {}: {}", peer_id, e);
                 }
             }
         }
 
         info!(
-            "📡 Broadcast complete: {} sent, {} errors",
+            "Broadcast complete: {} sent, {} errors",
             sent_count, error_count
         );
 
@@ -528,7 +551,7 @@ impl WebRTCP2PNetwork {
         let mut peers = self.peers.write().await;
         if let Some(peer) = peers.remove(peer_id) {
             peer.disconnect().await?;
-            info!("🔌 Disconnected from peer: {}", peer_id);
+            info!("Disconnected from peer: {}", peer_id);
 
             // Update stats
             {
@@ -541,7 +564,7 @@ impl WebRTCP2PNetwork {
 
     /// Shutdown the P2P network
     pub async fn shutdown(&self) -> Result<()> {
-        info!("🔄 Shutting down WebRTC P2P Network...");
+        info!("Shutting down WebRTC P2P Network...");
 
         // Send shutdown signal
         if let Err(e) = self.shutdown_tx.send(()).await {
@@ -560,7 +583,7 @@ impl WebRTCP2PNetwork {
             }
         }
 
-        info!("✅ WebRTC P2P Network shutdown complete");
+        info!("WebRTC P2P Network shutdown complete");
         Ok(())
     }
 
@@ -577,7 +600,7 @@ impl WebRTCP2PNetwork {
         // On data channel open
         let peer_id_open = peer_id.clone();
         data_channel.on_open(Box::new(move || {
-            info!("📂 Data channel opened for peer: {}", peer_id_open);
+            info!("Data channel opened for peer: {}", peer_id_open);
             Box::pin(async {})
         }));
 
@@ -590,8 +613,8 @@ impl WebRTCP2PNetwork {
 
             Box::pin(async move {
                 match Self::handle_incoming_message(&peer_id, msg, message_tx, peer_info).await {
-                    Ok(_) => debug!("📨 Processed message from peer: {}", peer_id),
-                    Err(e) => warn!("❌ Error processing message from {}: {}", peer_id, e),
+                    Ok(_) => debug!("Processed message from peer: {}", peer_id),
+                    Err(e) => warn!("Error processing message from {}: {}", peer_id, e),
                 }
             })
         }));
@@ -599,13 +622,13 @@ impl WebRTCP2PNetwork {
         // On data channel close
         let peer_id_close = peer_id.clone();
         data_channel.on_close(Box::new(move || {
-            warn!("📪 Data channel closed for peer: {}", peer_id_close);
+            warn!("Data channel closed for peer: {}", peer_id_close);
             Box::pin(async {})
         }));
 
         // On data channel error
         data_channel.on_error(Box::new(move |err| {
-            error!("❌ Data channel error for peer {}: {}", peer_id, err);
+            error!("Data channel error for peer {}: {}", peer_id, err);
             Box::pin(async {})
         }));
 
@@ -621,7 +644,7 @@ impl WebRTCP2PNetwork {
             move |state: RTCPeerConnectionState| {
                 let peer_id = peer_id.clone();
                 Box::pin(async move {
-                    info!("🔄 Peer {} connection state changed: {:?}", peer_id, state);
+                    info!("Peer {} connection state changed: {:?}", peer_id, state);
                 })
             },
         ));
@@ -634,13 +657,13 @@ impl WebRTCP2PNetwork {
                 Box::pin(async move {
                     if let Some(candidate) = candidate {
                         debug!(
-                            "🧊 ICE candidate for peer {}: {}",
+                            "ICE candidate for peer {}: {}",
                             peer_id,
-                            candidate.to_string()
+                            candidate
                         );
                         // TODO: Send ICE candidate through signaling server
                     } else {
-                        debug!("🧊 ICE gathering complete for peer: {}", peer_id);
+                        debug!("ICE gathering complete for peer: {}", peer_id);
                     }
                 })
             }));
@@ -669,7 +692,7 @@ impl WebRTCP2PNetwork {
         let p2p_message: P2PMessage =
             bincode::deserialize(&msg.data).context("Failed to deserialize P2P message")?;
 
-        debug!("📨 Received message from {}: {:?}", peer_id, p2p_message);
+        debug!("Received message from {}: {:?}", peer_id, p2p_message);
 
         // Send to message channel
         if let Err(e) = message_tx.send((peer_id.to_string(), p2p_message)) {
@@ -708,7 +731,7 @@ impl WebRTCP2PNetwork {
                                 };
 
                                 if let Err(e) = peer.send_message(ping_msg).await {
-                                    warn!("❌ Failed to send ping to peer {}: {}", peer_id, e);
+                                    warn!("Failed to send ping to peer {}: {}", peer_id, e);
                                 }
                             }
                         }
@@ -750,7 +773,7 @@ impl WebRTCP2PNetwork {
                             let mut peers = peers.write().await;
                             for peer_id in disconnected_peers {
                                 peers.remove(&peer_id);
-                                warn!("🗑️ Removed stale peer connection: {}", peer_id);
+                                warn!("Removed stale peer connection: {}", peer_id);
                             }
                         }
 
@@ -792,14 +815,14 @@ impl WebRTCP2PNetwork {
                                     &peers,
                                     &stats
                                 ).await {
-                                    warn!("❌ Error processing message from {}: {}", peer_id, e);
+                                    warn!("Error processing message from {}: {}", peer_id, e);
                                 }
                             }
                             Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                                warn!("⚠️ Message receiver lagged, skipped {} messages", skipped);
+                                warn!("Message receiver lagged, skipped {skipped} messages");
                             }
                             Err(broadcast::error::RecvError::Closed) => {
-                                info!("📴 Message channel closed, stopping message processing");
+                                info!("Message channel closed, stopping message processing");
                                 break;
                             }
                         }
@@ -816,7 +839,7 @@ impl WebRTCP2PNetwork {
         peers: &Arc<RwLock<HashMap<String, Arc<PeerConnection>>>>,
         stats: &Arc<Mutex<NetworkStats>>,
     ) -> Result<()> {
-        info!("📨 Processing message from peer {}: {:?}", peer_id, message);
+        info!("Processing message from peer {}: {:?}", peer_id, message);
 
         // Update stats
         {
@@ -845,8 +868,7 @@ impl WebRTCP2PNetwork {
                 timestamp,
             } => {
                 info!(
-                    "🤝 Received handshake from peer {} (node: {}, version: {}, time: {})",
-                    peer_id, node_id, version, timestamp
+                    "Received handshake from peer {peer_id} (node: {node_id}, version: {version}, time: {timestamp})"
                 );
                 // Handshake received - peer is identified
             }
@@ -856,7 +878,7 @@ impl WebRTCP2PNetwork {
                 timestamp,
             } => {
                 info!(
-                    "📥 Received transaction {} from peer {} (size: {} bytes, time: {})",
+                    "Received transaction {} from peer {} (size: {} bytes, time: {})",
                     tx_hash,
                     peer_id,
                     tx_data.len(),
@@ -871,7 +893,7 @@ impl WebRTCP2PNetwork {
                 timestamp,
             } => {
                 info!(
-                    "📦 Received block {} #{} from peer {} (size: {} bytes, time: {})",
+                    "Received block {} #{} from peer {} (size: {} bytes, time: {})",
                     block_hash,
                     block_number,
                     peer_id,
@@ -887,7 +909,7 @@ impl WebRTCP2PNetwork {
                 timestamp,
             } => {
                 info!(
-                    "📤 Received data request {} for {:?} {} from peer {} (time: {})",
+                    "Received data request {} for {:?} {} from peer {} (time: {})",
                     request_id, data_type, data_hash, peer_id, timestamp
                 );
                 // Data request received - should respond with requested data
@@ -900,7 +922,7 @@ impl WebRTCP2PNetwork {
                 match data {
                     Some(data_bytes) => {
                         info!(
-                            "📥 Received data response {} from peer {} (size: {} bytes, time: {})",
+                            "Received data response {} from peer {} (size: {} bytes, time: {})",
                             request_id,
                             peer_id,
                             data_bytes.len(),
@@ -909,7 +931,7 @@ impl WebRTCP2PNetwork {
                     }
                     None => {
                         info!(
-                            "📥 Received empty data response {} from peer {} (time: {})",
+                            "Received empty data response {} from peer {} (time: {})",
                             request_id, peer_id, timestamp
                         );
                     }
@@ -922,7 +944,7 @@ impl WebRTCP2PNetwork {
                 peer_list,
                 timestamp,
             } => {
-                info!("📢 Received peer announcement from {} (node: {}, addr: {}, peers: {}, time: {})", 
+                info!("Received peer announcement from {} (node: {}, addr: {}, peers: {}, time: {})", 
                       peer_id, node_id, listen_addr, peer_list.len(), timestamp);
                 // Peer announcement received - could connect to new peers
             }
@@ -932,7 +954,7 @@ impl WebRTCP2PNetwork {
                 timestamp,
             } => {
                 warn!(
-                    "❌ Received error message from peer {} (code: {}, msg: {}, time: {})",
+                    "Received error message from peer {} (code: {}, msg: {}, time: {})",
                     peer_id, error_code, message, timestamp
                 );
                 // Error message received
@@ -1057,6 +1079,9 @@ impl Clone for WebRTCP2PNetwork {
             stats: Arc::clone(&self.stats),
             shutdown_tx: self.shutdown_tx.clone(),
             shutdown_rx: Arc::clone(&self.shutdown_rx),
+            discovery: self.discovery.clone(),
+            dht: Arc::clone(&self.dht),
+            auto_discovery: Arc::clone(&self.auto_discovery),
         }
     }
 }

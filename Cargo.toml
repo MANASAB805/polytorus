@@ -18,7 +18,6 @@ members = [
     "crates/consensus",
     "crates/data-availability", 
     "crates/p2p-network",
-    "crates/sdk",
 ]
 
 resolver = "2"
@@ -92,3 +91,7 @@ clap = { workspace = true }
 # Utilities
 chrono = { workspace = true }
 uuid = { workspace = true }
+
+# Persistence
+sled = { workspace = true }
+bincode = { workspace = true }

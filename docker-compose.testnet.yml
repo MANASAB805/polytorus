@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  # Bootstrap node - the first node that others connect to
+  polytorus-bootstrap:
+    build: .
+    container_name: polytorus-bootstrap
+    hostname: polytorus-bootstrap
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=info
+      - NODE_ID=bootstrap-node
+      - LISTEN_PORT=8080
+      - DEBUG_MODE=true
+    command: ["start-p2p", "--node-id", "bootstrap-node", "--listen-port", "8080", "--adaptive"]
+    networks:
+      - polytorus-testnet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Node 1 - connects to bootstrap
+  polytorus-node1:
+    build: .
+    container_name: polytorus-node1
+    hostname: polytorus-node1
+    ports:
+      - "8081:8081"
+    environment:
+      - RUST_LOG=info
+      - NODE_ID=node-1
+      - LISTEN_PORT=8081
+      - BOOTSTRAP_PEERS=polytorus-bootstrap:8080
+      - DEBUG_MODE=true
+    command: ["start-p2p", "--node-id", "node-1", "--listen-port", "8081", "--bootstrap-peers", "polytorus-bootstrap:8080", "--adaptive"]
+    networks:
+      - polytorus-testnet
+    depends_on:
+      - polytorus-bootstrap
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Node 2 - connects to bootstrap
+  polytorus-node2:
+    build: .
+    container_name: polytorus-node2
+    hostname: polytorus-node2
+    ports:
+      - "8082:8082"
+    environment:
+      - RUST_LOG=info
+      - NODE_ID=node-2
+      - LISTEN_PORT=8082
+      - BOOTSTRAP_PEERS=polytorus-bootstrap:8080
+      - DEBUG_MODE=true
+    command: ["start-p2p", "--node-id", "node-2", "--listen-port", "8082", "--bootstrap-peers", "polytorus-bootstrap:8080", "--adaptive"]
+    networks:
+      - polytorus-testnet
+    depends_on:
+      - polytorus-bootstrap
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Node 3 - connects to bootstrap
+  polytorus-node3:
+    build: .
+    container_name: polytorus-node3
+    hostname: polytorus-node3
+    ports:
+      - "8083:8083"
+    environment:
+      - RUST_LOG=info
+      - NODE_ID=node-3
+      - LISTEN_PORT=8083
+      - BOOTSTRAP_PEERS=polytorus-bootstrap:8080
+      - DEBUG_MODE=true
+    command: ["start-p2p", "--node-id", "node-3", "--listen-port", "8083", "--bootstrap-peers", "polytorus-bootstrap:8080", "--adaptive"]
+    networks:
+      - polytorus-testnet
+    depends_on:
+      - polytorus-bootstrap
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Transaction test client
+  polytorus-client:
+    build: .
+    container_name: polytorus-client
+    hostname: polytorus-client
+    environment:
+      - RUST_LOG=info
+      - NODE_ID=client-node
+      - LISTEN_PORT=8084
+      - BOOTSTRAP_PEERS=polytorus-bootstrap:8080,polytorus-node1:8081
+      - DEBUG_MODE=true
+    networks:
+      - polytorus-testnet
+    depends_on:
+      - polytorus-bootstrap
+      - polytorus-node1
+      - polytorus-node2
+      - polytorus-node3
+    # Client starts in sleep mode - we'll exec commands into it
+    command: ["sleep", "infinity"]
+
+networks:
+  polytorus-testnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
