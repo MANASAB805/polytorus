@@ -1107,13 +1107,16 @@ mod integration_tests {
     #[tokio::test]
     async fn test_blockchain_initialization() -> Result<()> {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let test_dir = format!("./test_data_init_{}", timestamp);
         let mut blockchain = PolyTorusBlockchain::new_with_storage(&test_dir)?;
         let genesis_id = blockchain.initialize_genesis().await?;
         assert_eq!(genesis_id.tx_hash, "genesis_tx");
         assert_eq!(genesis_id.output_index, 0);
-        
+
         // Cleanup test directory
         drop(blockchain);
         let _ = std::fs::remove_dir_all(&test_dir);
@@ -1123,7 +1126,10 @@ mod integration_tests {
     #[tokio::test]
     async fn test_transaction_processing() -> Result<()> {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let test_dir = format!("./test_data_tx_{}", timestamp);
         let mut blockchain = PolyTorusBlockchain::new_with_storage(&test_dir)?;
         let _genesis_id = blockchain.initialize_genesis().await?;
@@ -1131,7 +1137,7 @@ mod integration_tests {
         let tx_hash = blockchain.send_transaction("alice", "bob", 100_000).await?;
         assert!(!tx_hash.is_empty());
         assert!(tx_hash.starts_with("tx_alice_bob_100000_"));
-        
+
         // Cleanup test directory
         drop(blockchain);
         let _ = std::fs::remove_dir_all(&test_dir);
@@ -1141,12 +1147,15 @@ mod integration_tests {
     #[tokio::test]
     async fn test_blockchain_status() -> Result<()> {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let test_dir = format!("./test_data_status_{}", timestamp);
         let mut blockchain = PolyTorusBlockchain::new_with_storage(&test_dir)?;
         // This should not panic
         blockchain.get_status().await?;
-        
+
         // Cleanup test directory
         drop(blockchain);
         let _ = std::fs::remove_dir_all(&test_dir);
