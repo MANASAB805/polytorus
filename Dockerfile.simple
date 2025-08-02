@@ -1,0 +1,29 @@
+# Simple PolyTorus Docker image for testing
+FROM ubuntu:22.04
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy pre-built binary
+COPY target/release/polytorus /app/polytorus
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# Create non-root user
+RUN useradd -m -u 1000 polytorus && \
+    chown -R polytorus:polytorus /app && \
+    chmod +x /app/polytorus
+
+USER polytorus
+WORKDIR /app
+
+# Set the startup command
+EXPOSE 8080
+ENTRYPOINT ["./polytorus"]
+CMD []

@@ -91,3 +91,7 @@ clap = { workspace = true }
 # Utilities
 chrono = { workspace = true }
 uuid = { workspace = true }
+
+# Persistence
+sled = { workspace = true }
+bincode = { workspace = true }

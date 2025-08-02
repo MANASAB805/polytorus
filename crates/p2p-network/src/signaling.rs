@@ -117,12 +117,12 @@ impl SignalingServer {
             .await
             .context("Failed to bind signaling server")?;
 
-        info!("🔗 Signaling server listening on: {}", self.listen_addr);
+        info!("Signaling server listening on: {}", self.listen_addr);
 
         loop {
             match listener.accept().await {
                 Ok((stream, addr)) => {
-                    info!("📞 New signaling connection from: {}", addr);
+                    info!("New signaling connection from: {}", addr);
                     let peers = Arc::clone(&self.peers);
                     let stats = Arc::clone(&self.stats);
                     let broadcast_tx = self.broadcast_tx.clone();
@@ -132,12 +132,12 @@ impl SignalingServer {
                             Self::handle_peer_connection(stream, addr, peers, stats, broadcast_tx)
                                 .await
                         {
-                            error!("❌ Error handling peer connection {}: {}", addr, e);
+                            error!("Error handling peer connection {}: {}", addr, e);
                         }
                     });
                 }
                 Err(e) => {
-                    error!("❌ Failed to accept connection: {}", e);
+                    error!("Failed to accept connection: {}", e);
                 }
             }
         }
@@ -166,13 +166,13 @@ impl SignalingServer {
                 let json = match serde_json::to_string(&message) {
                     Ok(json) => json,
                     Err(e) => {
-                        error!("❌ Failed to serialize message: {}", e);
+                        error!("Failed to serialize message: {}", e);
                         continue;
                     }
                 };
 
                 if let Err(e) = writer.write_all(format!("{}\n", json).as_bytes()).await {
-                    error!("❌ Failed to send message to peer {}: {}", peer_id_out, e);
+                    error!("Failed to send message to peer {}: {}", peer_id_out, e);
                     break;
                 }
             }
@@ -191,14 +191,14 @@ impl SignalingServer {
             match buf_reader.read_line(&mut line).await {
                 Ok(0) => {
                     // Connection closed
-                    info!("📴 Peer {} disconnected", peer_id);
+                    info!("Peer {} disconnected", peer_id);
                     break;
                 }
                 Ok(_) => {
                     let message: SignalingMessage = match serde_json::from_str(line.trim()) {
                         Ok(msg) => msg,
                         Err(e) => {
-                            error!("❌ Invalid message from {}: {}", addr, e);
+                            error!("Invalid message from {}: {}", addr, e);
                             let error_msg = SignalingMessage::Error {
                                 message: format!("Invalid message format: {}", e),
                             };
@@ -209,7 +209,7 @@ impl SignalingServer {
                         }
                     };
 
-                    debug!("📨 Received signaling message from {}: {:?}", addr, message);
+                    debug!("Received signaling message from {}: {:?}", addr, message);
 
                     if let Err(e) = Self::process_signaling_message(
                         message,
@@ -221,11 +221,11 @@ impl SignalingServer {
                     )
                     .await
                     {
-                        error!("❌ Error processing message from {}: {}", addr, e);
+                        error!("Error processing message from {}: {}", addr, e);
                     }
                 }
                 Err(e) => {
-                    error!("❌ Error reading from {}: {}", addr, e);
+                    error!("Error reading from {}: {}", addr, e);
                     break;
                 }
             }
@@ -268,7 +268,7 @@ impl SignalingServer {
                 peer_id: reg_peer_id,
                 node_id,
             } => {
-                info!("📝 Registering peer: {} (node: {})", reg_peer_id, node_id);
+                info!("Registering peer: {} (node: {})", reg_peer_id, node_id);
 
                 let connected_peer = ConnectedPeer {
                     peer_id: reg_peer_id.clone(),
@@ -316,7 +316,7 @@ impl SignalingServer {
                 ref to,
                 sdp: _,
             } => {
-                info!("📋 Relaying offer from {} to {}", from, to);
+                info!("Relaying offer from {} to {}", from, to);
                 let target_id = to.clone();
                 Self::relay_message_to_peer(&target_id, message, peers).await?;
 
@@ -332,7 +332,7 @@ impl SignalingServer {
                 ref to,
                 sdp: _,
             } => {
-                info!("📝 Relaying answer from {} to {}", from, to);
+                info!("Relaying answer from {} to {}", from, to);
                 let target_id = to.clone();
                 Self::relay_message_to_peer(&target_id, message, peers).await?;
 
@@ -346,7 +346,7 @@ impl SignalingServer {
             SignalingMessage::IceCandidate {
                 ref from, ref to, ..
             } => {
-                debug!("🧊 Relaying ICE candidate from {} to {}", from, to);
+                debug!("Relaying ICE candidate from {} to {}", from, to);
                 let target_id = to.clone();
                 Self::relay_message_to_peer(&target_id, message, peers).await?;
 
@@ -358,7 +358,7 @@ impl SignalingServer {
             }
 
             _ => {
-                warn!("❓ Unhandled signaling message type from {}", peer_id);
+                warn!("Unhandled signaling message type from {}", peer_id);
             }
         }
 
@@ -377,9 +377,9 @@ impl SignalingServer {
                 .sender
                 .send(message)
                 .context("Failed to send message to target peer")?;
-            debug!("📤 Message relayed to peer: {}", target_peer_id);
+            debug!("Message relayed to peer: {}", target_peer_id);
         } else {
-            warn!("🔍 Target peer not found: {}", target_peer_id);
+            warn!("Target peer not found: {}", target_peer_id);
             return Err(anyhow::anyhow!("Target peer not found: {}", target_peer_id));
         }
 
