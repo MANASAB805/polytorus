@@ -203,7 +203,8 @@ impl PolyTorusUtxoConsensusLayer {
 
         // Ensure genesis block exists if not in restored blocks
         let genesis_hash = "genesis_utxo_block_hash".to_string();
-        blocks.entry(genesis_hash)
+        blocks
+            .entry(genesis_hash)
             .or_insert_with(|| Self::create_genesis_utxo_block(genesis_time));
 
         // Restore chain state from persistent data

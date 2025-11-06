@@ -55,7 +55,7 @@ use webrtc::{
 };
 
 use crate::auto_discovery::AutoDiscovery;
-use crate::discovery::{PeerDiscovery, Dht};
+use crate::discovery::{Dht, PeerDiscovery};
 use traits::{Hash, P2PNetworkLayer, UtxoBlock, UtxoTransaction};
 
 pub mod adaptive_network;
